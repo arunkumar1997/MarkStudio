@@ -16,10 +16,12 @@
 
 import MarkdownIt from "markdown-it";
 import markdownItKatex from "@vscode/markdown-it-katex";
+import markdownItFootnote from "markdown-it-footnote";
 import type { MarkStudioConfig } from "../../messaging/messages";
 import { MERMAID_BLOCK_CLASS, renderMermaidBlocks } from "./mermaid";
 import { applyCallouts } from "./callouts";
 import { applyWikiLinks } from "./wikiLinks";
+import { applyTaskLists } from "./taskLists";
 
 type Token = ReturnType<MarkdownIt["parse"]>[number];
 
@@ -42,11 +44,12 @@ export interface PreviewBlock {
 
 export interface PreviewRenderer {
   update(text: string): void;
-  // Re-read the resolved settings (T-3.1, T-3.2, T-3.3, T-3.4). The `math`,
-  // `mermaid`, `callouts` and `wikiLinks` flags change how markdown-it
-  // tokenises/renders, so toggling any of them rebuilds the instance and
-  // re-renders the last text — applied live without a reload. Other settings
-  // that do not affect the preview are ignored.
+  // Re-read the resolved settings (T-3.1…T-3.5). The `math`, `mermaid`,
+  // `callouts`, `wikiLinks`, `footnotes`, `taskLists`, `tables` and
+  // `strikethrough` flags change how markdown-it tokenises/renders, so
+  // toggling any of them rebuilds the instance and re-renders the last text —
+  // applied live without a reload. Other settings that do not affect the
+  // preview are ignored.
   setConfig(config: MarkStudioConfig): void;
   // Live, document-ordered list of rendered blocks with their source lines.
   // Returned array is owned by the renderer; callers must not mutate it.
@@ -66,11 +69,19 @@ export function createPreviewRenderer(
   let mermaidEnabled = initialConfig.mermaid;
   let calloutsEnabled = initialConfig.callouts;
   let wikiLinksEnabled = initialConfig.wikiLinks;
+  let footnotesEnabled = initialConfig.footnotes;
+  let taskListsEnabled = initialConfig.taskLists;
+  let tablesEnabled = initialConfig.tables;
+  let strikethroughEnabled = initialConfig.strikethrough;
   let md = createMarkdownIt(
     mathEnabled,
     mermaidEnabled,
     calloutsEnabled,
-    wikiLinksEnabled
+    wikiLinksEnabled,
+    footnotesEnabled,
+    taskListsEnabled,
+    tablesEnabled,
+    strikethroughEnabled
   );
 
   const root = document.createElement("article");
@@ -135,7 +146,11 @@ export function createPreviewRenderer(
         config.math === mathEnabled &&
         config.mermaid === mermaidEnabled &&
         config.callouts === calloutsEnabled &&
-        config.wikiLinks === wikiLinksEnabled
+        config.wikiLinks === wikiLinksEnabled &&
+        config.footnotes === footnotesEnabled &&
+        config.taskLists === taskListsEnabled &&
+        config.tables === tablesEnabled &&
+        config.strikethrough === strikethroughEnabled
       ) {
         return;
       }
@@ -143,11 +158,19 @@ export function createPreviewRenderer(
       mermaidEnabled = config.mermaid;
       calloutsEnabled = config.callouts;
       wikiLinksEnabled = config.wikiLinks;
+      footnotesEnabled = config.footnotes;
+      taskListsEnabled = config.taskLists;
+      tablesEnabled = config.tables;
+      strikethroughEnabled = config.strikethrough;
       md = createMarkdownIt(
         mathEnabled,
         mermaidEnabled,
         calloutsEnabled,
-        wikiLinksEnabled
+        wikiLinksEnabled,
+        footnotesEnabled,
+        taskListsEnabled,
+        tablesEnabled,
+        strikethroughEnabled
       );
       // Force a re-render of the current document under the new pipeline.
       if (lastRendered !== null) {
@@ -172,15 +195,22 @@ export function createPreviewRenderer(
 
 // Build a markdown-it instance, optionally wired with KaTeX math rendering
 // (T-3.1, ADR-0015), Mermaid diagram blocks (T-3.2, ADR-0016), callout boxes
-// (T-3.3) and wiki-style links (T-3.4). Rebuilt (not mutated) whenever a
+// (T-3.3), wiki-style links (T-3.4), footnotes + GFM task lists / tables /
+// strikethrough (T-3.5, ADR-0019). Rebuilt (not mutated) whenever a
 // preview-affecting setting flips, because markdown-it plugins/rules cannot be
 // cleanly detached once applied; the rebuild is a settings-change event, never
-// a per-keystroke cost.
+// a per-keystroke cost. Tables and strikethrough ship in markdown-it's default
+// preset, so they are toggled by disabling the built-in rulers rather than by
+// adding a dependency.
 function createMarkdownIt(
   math: boolean,
   mermaid: boolean,
   callouts: boolean,
-  wikiLinks: boolean
+  wikiLinks: boolean,
+  footnotes: boolean,
+  taskLists: boolean,
+  tables: boolean,
+  strikethrough: boolean
 ): MarkdownIt {
   const md = new MarkdownIt({
     // Raw HTML disabled by default for safety (ADR-0008). Phase 3 may revisit
@@ -206,6 +236,21 @@ function createMarkdownIt(
   }
   if (wikiLinks) {
     applyWikiLinks(md);
+  }
+  if (footnotes) {
+    md.use(markdownItFootnote);
+  }
+  if (taskLists) {
+    applyTaskLists(md);
+  }
+  // Tables and strikethrough are on in markdown-it's default preset; disable
+  // the built-in rulers when the user turns them off so the source degrades to
+  // plain text / paragraphs instead of rendering.
+  if (!tables) {
+    md.disable("table");
+  }
+  if (!strikethrough) {
+    md.disable("strikethrough");
   }
   return md;
 }
@@ -251,7 +296,7 @@ function patch(
     suffix < cache.length - prefix &&
     suffix < newHtml.length - prefix &&
     cache[cache.length - 1 - suffix].html ===
-    newHtml[newHtml.length - 1 - suffix]
+      newHtml[newHtml.length - 1 - suffix]
   ) {
     suffix++;
   }

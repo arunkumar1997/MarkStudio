@@ -29,7 +29,11 @@ describe("ConfigurationService.read", () => {
       math: true,
       mermaid: true,
       callouts: true,
-      wikiLinks: true
+      wikiLinks: true,
+      footnotes: true,
+      taskLists: true,
+      tables: true,
+      strikethrough: true
     });
   });
 
@@ -42,7 +46,11 @@ describe("ConfigurationService.read", () => {
       math: true,
       mermaid: true,
       callouts: true,
-      wikiLinks: true
+      wikiLinks: true,
+      footnotes: true,
+      taskLists: true,
+      tables: true,
+      strikethrough: true
     });
   });
 
@@ -60,7 +68,11 @@ describe("ConfigurationService.read", () => {
       math: true,
       mermaid: true,
       callouts: true,
-      wikiLinks: true
+      wikiLinks: true,
+      footnotes: true,
+      taskLists: true,
+      tables: true,
+      strikethrough: true
     });
   });
 
@@ -78,7 +90,11 @@ describe("ConfigurationService.read", () => {
       math: false,
       mermaid: true,
       callouts: true,
-      wikiLinks: true
+      wikiLinks: true,
+      footnotes: true,
+      taskLists: true,
+      tables: true,
+      strikethrough: true
     });
   });
 
@@ -96,7 +112,11 @@ describe("ConfigurationService.read", () => {
       math: true,
       mermaid: false,
       callouts: true,
-      wikiLinks: true
+      wikiLinks: true,
+      footnotes: true,
+      taskLists: true,
+      tables: true,
+      strikethrough: true
     });
   });
 
@@ -114,7 +134,11 @@ describe("ConfigurationService.read", () => {
       math: true,
       mermaid: true,
       callouts: false,
-      wikiLinks: true
+      wikiLinks: true,
+      footnotes: true,
+      taskLists: true,
+      tables: true,
+      strikethrough: true
     });
   });
 
@@ -132,8 +156,56 @@ describe("ConfigurationService.read", () => {
       math: true,
       mermaid: true,
       callouts: true,
-      wikiLinks: false
+      wikiLinks: false,
+      footnotes: true,
+      taskLists: true,
+      tables: true,
+      strikethrough: true
     });
+  });
+
+  it("defaults footnotes to true when unset", () => {
+    const service = new ConfigurationService();
+    assert.equal(service.read().footnotes, true);
+  });
+
+  it("honours an explicit footnotes override", () => {
+    __setConfigValues({ "preview.footnotes": false });
+    const service = new ConfigurationService();
+    assert.equal(service.read().footnotes, false);
+  });
+
+  it("defaults taskLists to true when unset", () => {
+    const service = new ConfigurationService();
+    assert.equal(service.read().taskLists, true);
+  });
+
+  it("honours an explicit taskLists override", () => {
+    __setConfigValues({ "preview.taskLists": false });
+    const service = new ConfigurationService();
+    assert.equal(service.read().taskLists, false);
+  });
+
+  it("defaults tables to true when unset", () => {
+    const service = new ConfigurationService();
+    assert.equal(service.read().tables, true);
+  });
+
+  it("honours an explicit tables override", () => {
+    __setConfigValues({ "preview.tables": false });
+    const service = new ConfigurationService();
+    assert.equal(service.read().tables, false);
+  });
+
+  it("defaults strikethrough to true when unset", () => {
+    const service = new ConfigurationService();
+    assert.equal(service.read().strikethrough, true);
+  });
+
+  it("honours an explicit strikethrough override", () => {
+    __setConfigValues({ "preview.strikethrough": false });
+    const service = new ConfigurationService();
+    assert.equal(service.read().strikethrough, false);
   });
 });
 

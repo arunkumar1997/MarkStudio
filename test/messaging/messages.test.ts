@@ -20,7 +20,11 @@ const VALID_CONFIG = {
   math: true,
   mermaid: true,
   callouts: true,
-  wikiLinks: true
+  wikiLinks: true,
+  footnotes: true,
+  taskLists: true,
+  tables: true,
+  strikethrough: true
 };
 
 describe("isHostToWebviewMessage", () => {
@@ -109,6 +113,26 @@ describe("isHostToWebviewMessage", () => {
         false
       );
       assert.equal(isHostToWebviewMessage({ type: "configChanged" }), false);
+    });
+
+    it("rejects a config missing any one T-3.5 flag (footnotes/taskLists/tables/strikethrough)", () => {
+      for (const flag of [
+        "footnotes",
+        "taskLists",
+        "tables",
+        "strikethrough"
+      ] as const) {
+        const incomplete = { ...VALID_CONFIG };
+        delete (incomplete as Record<string, unknown>)[flag];
+        assert.equal(
+          isHostToWebviewMessage({
+            type: "configChanged",
+            config: incomplete
+          }),
+          false,
+          `guard should reject a config missing the ${flag} flag`
+        );
+      }
     });
   });
 

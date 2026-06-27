@@ -353,6 +353,57 @@ function injectBaseStyles(): void {
       color: var(--vscode-textLink-activeForeground, var(--vscode-textLink-foreground));
       text-decoration-style: solid;
     }
+    /* Strikethrough (T-3.5). markdown-it emits <s>; <del> is themed too so the
+       style holds regardless of the tag. */
+    .markstudio-preview-content del,
+    .markstudio-preview-content s {
+      text-decoration: line-through;
+      color: var(--vscode-descriptionForeground);
+    }
+    /* GFM task lists (T-3.5). The whole list drops its bullets and left indent
+       so the checkbox aligns with the body text; the checkbox is read-only
+       (rendered disabled) this sprint. The accent colour is the focus border,
+       which is theme-aware in dark / light / high-contrast. */
+    .markstudio-preview-content ul.markstudio-task-list {
+      list-style: none;
+      padding-left: 0.2em;
+    }
+    .markstudio-preview-content li.markstudio-task-list-item {
+      list-style: none;
+    }
+    .markstudio-task-list-checkbox {
+      margin: 0 0.5em 0 0;
+      vertical-align: middle;
+      accent-color: var(--vscode-focusBorder, var(--vscode-textLink-foreground));
+    }
+    /* Footnotes (T-3.5). The reference superscript and the back-reference are
+       styled as links; the footnotes section sits below a separator rule, all
+       themed through --vscode-* variables. */
+    .markstudio-preview-content .footnote-ref a,
+    .markstudio-preview-content .footnote-backref {
+      color: var(--vscode-textLink-foreground);
+      text-decoration: none;
+    }
+    .markstudio-preview-content .footnote-ref a:hover,
+    .markstudio-preview-content .footnote-backref:hover {
+      color: var(--vscode-textLink-activeForeground, var(--vscode-textLink-foreground));
+      text-decoration: underline;
+    }
+    .markstudio-preview-content .footnotes-sep {
+      border: 0;
+      border-top: 1px solid var(--vscode-editorGroup-border, var(--vscode-panel-border, transparent));
+      margin: 1.6em 0 0.8em;
+    }
+    .markstudio-preview-content .footnotes {
+      font-size: 0.9em;
+      color: var(--vscode-descriptionForeground);
+    }
+    .markstudio-preview-content .footnotes-list {
+      padding-left: 1.4em;
+    }
+    .markstudio-preview-content .footnote-item p {
+      margin: 0.3em 0;
+    }
   `;
   document.head.append(style);
 }

@@ -26,6 +26,7 @@ The foundational ADRs below (0001–0006) encode the non-negotiable rules from [
 | [0016](#adr-0016-lazy-loaded-mermaid-for-diagram-rendering-in-the-preview) | Lazy-loaded Mermaid for diagram rendering in the preview | Accepted |
 | [0017](#adr-0017-callouts-as-a-dependency-free-markdown-it-core-rule) | Callouts as a dependency-free markdown-it core rule | Accepted |
 | [0018](#adr-0018-wiki-links-as-a-dependency-free-markdown-it-inline-rule) | Wiki links as a dependency-free markdown-it inline rule | Accepted |
+| [0019](#adr-0019-footnotes--gfm-completeness-plugin-for-footnotes-built-ins--an-in-tree-rule-for-the-rest) | Footnotes & GFM completeness: plugin for footnotes, built-ins + an in-tree rule for the rest | Accepted |
 
 ---
 
@@ -866,3 +867,50 @@ No rule bent. Upholds ADR-0002 (preview patched, never rebuilt, on the hot path)
 * [design/wiki-links.md](design/wiki-links.md)
 * [ROADMAP.md](ROADMAP.md) — Phase 3 M3.4
 * [TODO.md](TODO.md) — T-3.4
+
+---
+
+## ADR-0019: Footnotes & GFM completeness: plugin for footnotes, built-ins + an in-tree rule for the rest
+
+### Status
+`Accepted`
+
+### Date
+2026-06-27
+
+### Context
+**T-3.5** (Phase 3 M3.5) closes Phase 3 by adding four Markdown features to the preview: **footnotes** (`[^1]` references + `[^1]:` definitions), **GFM task lists** (`- [ ]` / `- [x]`), **GFM tables**, and **strikethrough** (`~~text~~`). Each must attach to the existing markdown-it preview, be **individually** toggleable via a `markstudio.preview.*` setting (default `true`, `resource` scope), degrade gracefully when off, and theme entirely via `--vscode-*` variables. The Producer decided against a single combined `gfm` toggle so each feature stays independently controllable. The open design question was, per feature: pull an npm plugin, or implement in-tree?
+
+### Decision
+A **per-feature** sourcing decision, not one blanket policy:
+
+1. **Tables & strikethrough — use markdown-it's built-ins; toggle the rulers.** markdown-it's *default* preset already ships GFM tables (`table` block rule) and strikethrough (`strikethrough` inline rule), so they render today with **no dependency**. The toggle simply calls `md.disable("table")` / `md.disable("strikethrough")` when the user turns the feature off, degrading to plain paragraphs / literal `~~` text. Adding a plugin for syntax markdown-it already parses would be pure waste.
+2. **Task lists — a dependency-free in-tree core rule** (`src/webview/preview/taskLists.ts`, `applyTaskLists(md)`), mirroring callouts (ADR-0017) and wiki links (ADR-0018). Registered `after("inline")`, it finds a list item whose first paragraph opens with `[ ]` / `[x]` / `[X]`, prepends a **disabled** `html_inline` checkbox, strips the marker, and stamps `markstudio-task-list` / `markstudio-task-list-item` classes so the bullet can be removed in CSS. The logic is ~30 lines (the well-known `markdown-it-task-lists` plugin is the same algorithm) and stays fully under our control — and crucially, checkboxes are rendered **read-only** this sprint (no source write-back), which a stock plugin's label-wrapper / write-back affordances would only get in the way of.
+3. **Footnotes — the one new runtime dependency, `markdown-it-footnote`.** Footnotes are genuinely non-trivial: a two-pass parse (collect refs inline, then append a numbered, back-linked definitions section as a `footnote_tail` core rule), correct numbering, and `id`/`href` anchoring. Re-implementing that in-tree would be a meaningful surface to own and get wrong. `markdown-it-footnote` is the canonical, ~11 KB, zero-transitive-dependency plugin maintained by the markdown-it org itself; it is applied with `md.use(markdownItFootnote)` only when the setting is on. Its default class names (`footnote-ref`, `footnote-backref`, `footnotes`, `footnotes-sep`, `footnotes-list`, `footnote-item`) are themed via `--vscode-*` in `main.ts`.
+4. **All four reuse the config seam (T-111).** `MarkStudioConfig` gains `footnotes` / `taskLists` / `tables` / `strikethrough` (validated by `isMarkStudioConfig`); `ConfigurationService.read` resolves each `preview.*` key (default `true`); `package.json` contributes the four `resource`-scoped settings. `PreviewRenderer.createMarkdownIt(...)` applies/enables each when on, and `setConfig` rebuilds the single markdown-it instance when **any** preview flag flips (ADR-0008) — one instance stays on the hot typing path. No new message type.
+
+### Alternatives Considered
+1. **A single combined `markstudio.preview.gfm` toggle** — Rejected by the Producer: the four features have different value and risk profiles (tables/strikethrough are universally wanted; footnotes/task lists less so), so independent control is worth four small settings.
+2. **An npm plugin for tables / strikethrough** (e.g. forcing `markdown-it-gfm`-style packages) — Rejected: markdown-it already parses both; a dependency would add bytes for zero capability.
+3. **An npm plugin for task lists** (`markdown-it-task-lists`) — Rejected (narrowly): the algorithm is ~30 lines, we want read-only checkboxes with no write-back affordances this sprint, and keeping it in-tree matches the callouts/wiki-links precedent. Revisit if interactive toggling (Phase 4) makes a maintained plugin clearly cheaper.
+4. **An in-tree footnote rule** — Rejected: footnotes' two-pass numbering/back-linking is exactly the kind of non-trivial, easy-to-get-wrong parsing where a canonical, tiny, same-org plugin beats owning the code.
+
+### Reasoning
+The dependency policy (ADR-0005) is "lean, not zero": add a dependency when it buys real, non-trivial capability, and write in-tree when the logic is small and we want control. Applied per feature that yields exactly one new runtime dependency (`markdown-it-footnote`) for the one genuinely hard feature, and no new dependency for the other three. Every feature rides the same `createMarkdownIt` + `setConfig` rebuild seam, so the hot path keeps a single markdown-it instance and the block-diff patcher is untouched.
+
+### Consequences
+**Positive:** Footnotes, task lists, tables, and strikethrough render natively, each individually toggleable and degrading gracefully when off — for **one** small new runtime dependency. Production-minified webview **2,025.3 KB → 2,041.4 KB (+16.1 KB)** for the footnote plugin + task-list rule + CSS (KaTeX still dominates the 2 MB). No new message type, no CSP change, no webview structural change.
+**Negative / Trade-offs:** `markdown-it-footnote` ships no types, so `@types/markdown-it-footnote` is added as a devDependency. Task-list checkboxes are read-only this sprint (no source write-back) — interactive toggling is a Phase 4-style follow-up. Visual theming cannot be asserted under jsdom, so it stays in the manual EDH matrix; the integration tests cover the markdown-it seam (rendered when on, degraded when off, live toggle) for each feature.
+**Neutral:** Four new `markstudio.preview.*` settings and `MarkStudioConfig` fields; a new `src/webview/preview/taskLists.ts` module; one new runtime dependency + its types.
+
+### Compliance Impact
+No rule bent. Upholds ADR-0002 (preview patched, never rebuilt, on the hot path), ADR-0003/0008 (markdown-it seam + single instance for preview rendering), ADR-0004 (strict CSP, `--vscode-*` theming), and ADR-0005 (no UI framework; one justified dependency, none where the built-ins suffice).
+
+### References
+* [ADR-0005](#adr-0005-vanilla-typescript-html-css--no-frameworks)
+* [ADR-0008](#adr-0008-markdown-it-package-and-incremental-block-level-preview-patching)
+* [ADR-0017](#adr-0017-callouts-as-a-dependency-free-markdown-it-core-rule)
+* [ADR-0018](#adr-0018-wiki-links-as-a-dependency-free-markdown-it-inline-rule)
+* [design/gfm.md](design/gfm.md)
+* [ROADMAP.md](ROADMAP.md) — Phase 3 M3.5
+* [TODO.md](TODO.md) — T-3.5

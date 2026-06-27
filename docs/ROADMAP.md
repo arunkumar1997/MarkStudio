@@ -66,7 +66,7 @@ Make the core comfortable for daily, long-form writing.
 
 ---
 
-## Phase 3 — Modern Markdown · *In progress*
+## Phase 3 — Modern Markdown · *Done*
 
 The syntax extensions that make Markdown feel modern. Each attaches as a CodeMirror 6 extension and/or markdown-it plugin and **degrades gracefully** when disabled.
 
@@ -75,11 +75,11 @@ The syntax extensions that make Markdown feel modern. Each attaches as a CodeMir
 * M3.2 — Mermaid diagrams *(Done — T-3.2, ADR-0016)*
 * M3.3 — Callouts / admonitions *(Done — T-3.3, ADR-0017)*
 * M3.4 — Wiki-style links (`[[...]]`) *(Done — T-3.4, ADR-0018)*
-* M3.5 — Footnotes and GFM completeness (tables, task lists, strikethrough)
+* M3.5 — Footnotes and GFM completeness (tables, task lists, strikethrough) *(Done — T-3.5, ADR-0019)*
 
 **Exit criteria**
-* Every feature is individually toggleable via configuration.
-* Disabling a feature never breaks rendering or the editor.
+* Every feature is individually toggleable via configuration. *(Met — each Phase 3 feature has its own `markstudio.preview.*` setting)*
+* Disabling a feature never breaks rendering or the editor. *(Met — every feature degrades to literal/plain rendering when off; verified by the integration suite)*
 
 ---
 
