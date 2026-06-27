@@ -14,7 +14,7 @@ import {
   isWebviewToHostMessage
 } from "../../src/messaging/messages";
 
-const VALID_CONFIG = { lineNumbers: true };
+const VALID_CONFIG = { lineNumbers: true, wordWrap: true };
 
 describe("isHostToWebviewMessage", () => {
   it("rejects non-objects", () => {

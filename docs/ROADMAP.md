@@ -58,7 +58,7 @@ Make the core comfortable for daily, long-form writing.
 * M2.2 — Document outline (headings) with navigation
 * M2.3 — In-editor search and replace *(Done — T-2.3)*
 * M2.4 — Word count and reading-time indicator *(Done — T-2.4)*
-* M2.5 — Word wrap toggle and multiple cursors
+* M2.5 — Word wrap toggle and multiple cursors *(Done — T-2.5)*
 
 **Exit criteria**
 * Scroll sync feels natural in both directions without jitter.

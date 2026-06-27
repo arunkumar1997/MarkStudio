@@ -18,7 +18,8 @@ export class ConfigurationService {
   public read(resource?: vscode.Uri): MarkStudioConfig {
     const config = vscode.workspace.getConfiguration(SECTION, resource ?? null);
     return {
-      lineNumbers: config.get<boolean>("editor.lineNumbers", true)
+      lineNumbers: config.get<boolean>("editor.lineNumbers", true),
+      wordWrap: config.get<boolean>("editor.wordWrap", true)
     };
   }
 

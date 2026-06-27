@@ -7,19 +7,19 @@
 ## 1. Snapshot
 
 * **Current phase:** **Phase 2 — Editing Quality, in progress.** Phase 1 — Editing Core is complete.
-* **Current milestone:** **T-2.3 — In-editor search & replace (M2.3) Done.** CodeMirror's find/replace panel is now wired into the source editor (`search({ top: true })`) and themed to the VS Code find widget entirely through `--vscode-*` variables. `Ctrl/Cmd+F` opens find; the panel's replace field and checkboxes drive replace, match-case, regexp, and whole-word; `Enter`/`F3` step through matches. The feature is fully webview-contained — no host code, no protocol change, no new dependency (`@codemirror/search` has been bundled since T-104).
-* **Overall completion (qualitative):** Phase 0: 100%. Phase 1: 100%. Phase 2: ~60% by milestone (M2.1 scroll sync + M2.3 search & replace + M2.4 word count done; M2.2 outline and M2.5 word-wrap toggle / multi-cursor remain).
-* **Last updated:** 2026-06-27 by the T-2.3 session
+* **Current milestone:** **T-2.5 — Word-wrap toggle & multiple cursors (M2.5) Done.** A new `markstudio.editor.wordWrap` setting (boolean, default `true`, `resource` scope) toggles soft-wrap in the source editor live via a CM6 `Compartment` — the same pattern T-111 established for line numbers — so the long-lived `EditorView` is reconfigured, never rebuilt. Multiple cursors needed no new code: they ship with the editor from T-104 (`allowMultipleSelections`, `drawSelection`, `rectangularSelection`, `crosshairCursor`). `MarkStudioConfig` gained a `wordWrap: boolean` field, validated by `isMarkStudioConfig`. No new dependency; only an added config field on the protocol.
+* **Overall completion (qualitative):** Phase 0: 100%. Phase 1: 100%. Phase 2: ~80% by milestone (M2.1 scroll sync + M2.3 search & replace + M2.4 word count + M2.5 word-wrap/multi-cursor done; only M2.2 outline remains).
+* **Last updated:** 2026-06-27 by the T-2.5 session
 * **Last commit on `main`:** *(repository is under git; changes from this session are uncommitted)*
 
 ---
 
 ## 2. Current Focus
 
-* **Active initiative:** **Phase 2 — Editing Quality.** T-2.3 lands in-editor search & replace. `src/webview/editor/extensions.ts` adds the `search({ top: true })` extension (the panel mounts at the top, mirroring VS Code's find widget) alongside the already-bound `searchKeymap`, and extends the editor theme with find-panel selectors (`.cm-panels`, `.cm-panel.cm-search` inputs/buttons/close) keyed to `--vscode-editorWidget-*`, `--vscode-input-*`, `--vscode-button-secondary*`, and `--vscode-focusBorder`. **No new dependency, no protocol change, no host change.**
-* **Owner (current agent):** T-2.3 session
+* **Active initiative:** **Phase 2 — Editing Quality.** T-2.5 lands the word-wrap toggle and confirms multiple cursors. `src/webview/editor/extensions.ts` moves the previously always-on `EditorView.lineWrapping` behind a new `wordWrapCompartment` (`wordWrapExtension(enabled)` returns `EditorView.lineWrapping` or `[]`), seeded from `config.wordWrap` in `buildExtensions`; `createEditor.setConfig` reconfigures it alongside the line-numbers compartment in a single dispatch. `MarkStudioConfig` + `isMarkStudioConfig` + `ConfigurationService.read` + `package.json` gained the `wordWrap` field/property. **No new dependency, no protocol-shape change beyond the added config field, no host structural change.**
+* **Owner (current agent):** T-2.5 session
 * **Started:** 2026-06-27
-* **Target outcome:** The remaining Phase 2 milestones are the document outline (M2.2 / T-2.2 — needs a design decision) and the word-wrap toggle / multiple cursors (M2.5 / T-2.5) — see [TODO.md](TODO.md).
+* **Target outcome:** The one remaining Phase 2 milestone is the document outline (M2.2 / T-2.2), which needs an upfront design decision — see [TODO.md](TODO.md).
 
 ---
 
@@ -43,6 +43,7 @@ User-visible features that are shipped and stable.
 | Reactive configuration service — `markstudio.editor.lineNumbers` toggles the CM6 line-number gutter via a `Compartment` (ADR-0010) | 1 | Unreleased (T-111) |
 | **Word count & reading-time status-bar indicator (Phase 2 M2.4)** — native status-bar item showing live word count for the active MarkStudio editor; tooltip adds characters + estimated reading time; computed host-side, debounced, no custom UI | 2 | Unreleased (T-2.4) |
 | **In-editor search & replace (Phase 2 M2.3)** — CodeMirror find/replace panel mounted at the top of the editor; `Ctrl/Cmd+F` to find, replace field + match-case / regexp / whole-word checkboxes; themed entirely to the VS Code find widget via `--vscode-*` variables | 2 | Unreleased (T-2.3) |
+| **Word-wrap toggle & multiple cursors (Phase 2 M2.5)** — `markstudio.editor.wordWrap` (default on) toggles soft-wrap live via a CM6 `Compartment`; multi-cursor / rectangular selection (Alt+click, Ctrl/Cmd+click, Alt+drag) ship with the editor | 2 | Unreleased (T-2.5) |
 
 For details, see [FEATURES.md](FEATURES.md).
 
@@ -52,7 +53,7 @@ For details, see [FEATURES.md](FEATURES.md).
 
 | Item | State | Owner | Notes |
 | ---- | ----- | ----- | ----- |
-| *(none — T-2.3 closed)* | — | — | Phase 2 is underway; next is M2.2 (outline, needs a design note) or M2.5 (word-wrap toggle / multi-cursor) |
+| *(none — T-2.5 closed)* | — | — | Phase 2 is underway; the only remaining milestone is M2.2 (outline, needs a design note) |
 
 ---
 
@@ -91,9 +92,9 @@ For details, see [FEATURES.md](FEATURES.md).
 
 ## 8. Health Checks
 
-* [x] Build is green — `npm run build` produces `dist/extension.js`, `dist/webview.js`, and the Codicons assets; production-minified webview is **~701.4 KB** (+~2 KB for the search panel + theming), host bundle **unchanged** (webview-only feature)
+* [x] Build is green — `npm run build` produces `dist/extension.js`, `dist/webview.js`, and the Codicons assets; production-minified webview is **~701.5 KB** (≈ unchanged — word wrap was already bundled, now compartment-wrapped), host bundle unchanged
 * [x] Typecheck is green — `npm run typecheck` (strict) **and** `npm run typecheck:test` (strict, incl. tests) pass
-* [x] Tests are green — `npm test` runs **61 tests** (53 unit + 8 integration, `node:test`); the Extension Host lifecycle layer (`npm run test:exthost`, 4 tests) runs separately. CI runs all three layers on push/PR
+* [x] Tests are green — `npm test` runs **63 tests** (55 unit + 8 integration, `node:test`); the Extension Host lifecycle layer (`npm run test:exthost`, 4 tests) runs separately. CI runs all three layers on push/PR
 * [x] Lint is green — `npm run lint` (ESLint `--max-warnings 0` + `prettier --check .`) clean
 * [x] No unresolved high-severity issues
 * [x] Documentation is current with the codebase
@@ -104,18 +105,22 @@ For details, see [FEATURES.md](FEATURES.md).
 
 ## 9. Recently Completed (Last Session)
 
-* Implemented **T-2.3 — In-editor search & replace** (Phase 2 milestone M2.3):
-  * `src/webview/editor/extensions.ts` — added `search({ top: true })` so the CodeMirror find/replace panel mounts at the top of the editor (mirroring VS Code's find widget); the already-bound `searchKeymap` activates it (`Ctrl/Cmd+F`, `F3`, etc.).
-  * Extended the editor theme with find-panel selectors (`.cm-panels`, `.cm-panel.cm-search` text inputs, buttons, and the close affordance) keyed entirely to `--vscode-editorWidget-*`, `--vscode-input-*`, `--vscode-button-secondary*`, and `--vscode-focusBorder`, so the panel is theme-correct in light/dark/high-contrast (ADR-0004).
-  * Documentation pass: [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) (Search & replace → Shipped), [ROADMAP.md](ROADMAP.md) (M2.3 → Done), [TODO.md](TODO.md) (T-2.3 → Done), this file, and [AGENT_HANDOFF.md](AGENT_HANDOFF.md).
-  * **No runtime dependency, no protocol change, no host change.** `npm run lint`, `npm run typecheck`, `npm run typecheck:test`, `npm run build`, and `npm test` (53 unit + 8 integration) are all green locally.
+* Implemented **T-2.5 — Word-wrap toggle & multiple cursors** (Phase 2 milestone M2.5):
+  * `src/webview/editor/extensions.ts` — moved the previously always-on `EditorView.lineWrapping` behind a new exported `wordWrapCompartment` + `wordWrapExtension(enabled)` (returns `EditorView.lineWrapping` or an empty `[]`), seeded from `config.wordWrap` in `buildExtensions`.
+  * `src/webview/editor/createEditor.ts` — `setConfig` now reconfigures the line-numbers and word-wrap compartments together in a single `view.dispatch`.
+  * `src/messaging/messages.ts` — `MarkStudioConfig` gained `wordWrap: boolean`; `isMarkStudioConfig` validates it.
+  * `src/services/ConfigurationService.ts` + `package.json` — resolve / contribute `markstudio.editor.wordWrap` (boolean, default `true`, `resource` scope).
+  * **Multiple cursors:** confirmed — already provided by the editor since T-104 (`allowMultipleSelections`, `drawSelection`, `rectangularSelection`, `crosshairCursor`); no new code.
+  * Tests updated for the new config field (`ConfigurationService.test.ts`, `messages.test.ts`, integration `createEditor.test.ts`); 2 new `wordWrap` unit tests.
+  * Documentation pass: [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) (Word wrap & multiple cursors → Shipped), [ROADMAP.md](ROADMAP.md) (M2.5 → Done), [TODO.md](TODO.md) (T-2.5 → Done), [api/message-protocol.md](api/message-protocol.md), this file, and [AGENT_HANDOFF.md](AGENT_HANDOFF.md).
+  * **No new dependency, no protocol-shape change beyond the added config field, no host structural change.** `npm run lint`, `npm run typecheck`, `npm run typecheck:test`, `npm run build`, and `npm test` (55 unit + 8 integration) are all green locally.
 
 ---
 
 ## 10. Recommended Next Task
 
-* **Task:** Continue **Phase 2 — Editing Quality**. The two remaining milestones are **T-2.5 — Word-wrap toggle and multiple cursors** (M2.5; small, low-risk — a new `markstudio.*` setting via the `Compartment` pattern from T-111 plus confirming multi-cursor) or **T-2.2 — Document outline** (M2.2; the headline Phase 2 exit criterion, but it needs an upfront design decision because VS Code's native Outline view does not surface for custom editors).
-* **Why:** T-2.5 is the lowest-risk next step and reuses the established settings/compartment pattern; T-2.2 is higher value but warrants a design note (host `TreeDataProvider` vs. in-webview pane) and likely an ADR first.
+* **Task:** Complete **Phase 2 — Editing Quality** with **T-2.2 — Document outline** (M2.2), the last remaining Phase 2 milestone and the headline exit criterion.
+* **Why:** It is the only Phase 2 milestone left. It needs an upfront design decision first because VS Code's native Outline view / breadcrumbs are driven by `vscode.window.activeTextEditor`, which is `undefined` while a custom editor is focused, so a plain `DocumentSymbolProvider` may not surface for MarkStudio. Decide between a host-side `TreeDataProvider` (view container) and an in-webview outline pane — capture it in [design/](design/) and likely an ADR before coding.
 * **Suggested prompt:** [.ai/PROMPTS/feature.md](../.ai/PROMPTS/feature.md).
 
 ---

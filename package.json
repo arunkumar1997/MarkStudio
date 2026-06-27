@@ -110,6 +110,12 @@
           "default": true,
           "scope": "resource",
           "description": "Show line numbers in the MarkStudio source editor."
+        },
+        "markstudio.editor.wordWrap": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "Soft-wrap long lines in the MarkStudio source editor."
         }
       }
     }

@@ -25,6 +25,8 @@ const LAYOUT_MODES: ReadonlyArray<LayoutMode> = [
 export interface MarkStudioConfig {
   // `markstudio.editor.lineNumbers` — show the CM6 line-number gutter.
   readonly lineNumbers: boolean;
+  // `markstudio.editor.wordWrap` — soft-wrap long lines in the source editor.
+  readonly wordWrap: boolean;
 }
 
 // First content load. Sent once the webview signals `ready`.
@@ -174,7 +176,11 @@ function isEditChange(value: unknown): value is EditChange {
 }
 
 function isMarkStudioConfig(value: unknown): value is MarkStudioConfig {
-  return isObject(value) && typeof value.lineNumbers === "boolean";
+  return (
+    isObject(value) &&
+    typeof value.lineNumbers === "boolean" &&
+    typeof value.wordWrap === "boolean"
+  );
 }
 
 export function isHostToWebviewMessage(

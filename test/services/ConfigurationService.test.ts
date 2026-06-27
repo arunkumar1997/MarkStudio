@@ -23,13 +23,24 @@ describe("ConfigurationService.read", () => {
 
   it("defaults lineNumbers to true when unset", () => {
     const service = new ConfigurationService();
-    assert.deepEqual(service.read(), { lineNumbers: true });
+    assert.deepEqual(service.read(), { lineNumbers: true, wordWrap: true });
   });
 
   it("honours an explicit lineNumbers override", () => {
     __setConfigValues({ "editor.lineNumbers": false });
     const service = new ConfigurationService();
-    assert.deepEqual(service.read(), { lineNumbers: false });
+    assert.deepEqual(service.read(), { lineNumbers: false, wordWrap: true });
+  });
+
+  it("defaults wordWrap to true when unset", () => {
+    const service = new ConfigurationService();
+    assert.equal(service.read().wordWrap, true);
+  });
+
+  it("honours an explicit wordWrap override", () => {
+    __setConfigValues({ "editor.wordWrap": false });
+    const service = new ConfigurationService();
+    assert.deepEqual(service.read(), { lineNumbers: true, wordWrap: false });
   });
 });
 

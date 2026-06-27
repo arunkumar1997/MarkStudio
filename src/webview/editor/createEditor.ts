@@ -15,7 +15,9 @@ import { EditorView } from "@codemirror/view";
 import {
   buildExtensions,
   lineNumbersCompartment,
-  lineNumbersExtension
+  lineNumbersExtension,
+  wordWrapCompartment,
+  wordWrapExtension
 } from "./extensions";
 import type { MarkStudioConfig } from "../../messaging/messages";
 
@@ -99,13 +101,13 @@ export function createEditor(options: CreateEditorOptions): MarkStudioEditor {
 
   const snapshotListener = onSnapshotChange
     ? EditorView.updateListener.of((update) => {
-        if (update.selectionSet || update.docChanged) {
-          scheduleSnapshot();
-        }
-      })
+      if (update.selectionSet || update.docChanged) {
+        scheduleSnapshot();
+      }
+    })
     : EditorView.updateListener.of(() => {
-        /* no-op: snapshots not requested */
-      });
+      /* no-op: snapshots not requested */
+    });
 
   const initialSelection = resolveInitialSelection(
     initialCursor,
@@ -188,13 +190,16 @@ export function createEditor(options: CreateEditorOptions): MarkStudioEditor {
       });
     },
     setConfig(config: MarkStudioConfig): void {
-      // Reconfigure only the affected compartment so the editor updates
-      // live without a rebuild (T-111). Reconfiguring to the same value
-      // is a cheap no-op in CM6.
+      // Reconfigure only the affected compartments so the editor updates
+      // live without a rebuild (T-111, T-2.5). Reconfiguring to the same
+      // value is a cheap no-op in CM6.
       view.dispatch({
-        effects: lineNumbersCompartment.reconfigure(
-          lineNumbersExtension(config.lineNumbers)
-        )
+        effects: [
+          lineNumbersCompartment.reconfigure(
+            lineNumbersExtension(config.lineNumbers)
+          ),
+          wordWrapCompartment.reconfigure(wordWrapExtension(config.wordWrap))
+        ]
       });
     },
     focus(): void {
@@ -261,7 +266,7 @@ function computeMinimalChange(
   while (
     suffix < maxSuffix &&
     current.charCodeAt(currentLength - 1 - suffix) ===
-      next.charCodeAt(nextLength - 1 - suffix)
+    next.charCodeAt(nextLength - 1 - suffix)
   ) {
     suffix++;
   }

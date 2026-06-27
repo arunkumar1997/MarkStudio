@@ -22,7 +22,7 @@
 | Toolbar (Codicons) | In progress | Three layout-mode buttons shipped in the App Shell toolbar (T-107) — source-only, split, preview-only. Word wrap, search, and outline buttons land alongside their underlying features (T-2.x). |
 | Theme integration | Shipped | All styling from `--vscode-*` variables; correct in light, dark, and high contrast (T-104 — verified in EDH outstanding). |
 | Scroll synchronization | Shipped | In split mode, scrolling either pane scrolls the other to the matching Markdown block; preview blocks are anchored to source lines via the markdown-it token map and interpolated for smooth alignment, with per-direction feedback suppression (T-2.1). |
-| Configuration / settings | Shipped | `markstudio.*` settings are read reactively host-side (`ConfigurationService`) and applied live without a reload. First setting: `markstudio.editor.lineNumbers` (default on) toggles the CodeMirror line-number gutter via a CM6 `Compartment` (T-111, ADR-0010). Future options extend `MarkStudioConfig` + the `configChanged` message. |
+| Configuration / settings | Shipped | `markstudio.*` settings are read reactively host-side (`ConfigurationService`) and applied live without a reload. Settings: `markstudio.editor.lineNumbers` (default on) toggles the CodeMirror line-number gutter (T-111, ADR-0010); `markstudio.editor.wordWrap` (default on) toggles soft-wrap (T-2.5) — each via a CM6 `Compartment`. Future options extend `MarkStudioConfig` + the `configChanged` message. |
 
 ---
 
@@ -34,7 +34,7 @@
 | Document outline | Planned | Navigable heading outline that updates incrementally. |
 | Search & replace | Shipped | In-editor find/replace built on CodeMirror's `@codemirror/search`: the panel mounts at the top (like VS Code's find widget), opens with `Ctrl/Cmd+F`, supports replace, match-case, regexp, and whole-word, and is themed entirely via `--vscode-*` variables (T-2.3). |
 | Word count & reading time | Shipped | Native status-bar indicator showing live word count for the active MarkStudio editor; tooltip adds characters and estimated reading time (~200 wpm). Computed host-side from the document; debounced; no custom UI (T-2.4). |
-| Word wrap & multiple cursors | Planned | Wrap toggle and multi-cursor editing. |
+| Word wrap & multiple cursors | Shipped | `markstudio.editor.wordWrap` (default on) toggles soft-wrap live via a CM6 `Compartment`, mirroring the line-numbers pattern (T-2.5, T-111). Multiple cursors / rectangular selection ship with the editor: Alt+click adds a cursor, Ctrl/Cmd+click adds a selection, and Alt+drag makes a rectangular selection (T-104). |
 
 ---
 
