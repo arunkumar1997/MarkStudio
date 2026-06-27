@@ -49,15 +49,15 @@ A native Markdown editor with split view and live preview. Nothing flashy — ju
 
 ---
 
-## Phase 2 — Editing Quality · *Planned*
+## Phase 2 — Editing Quality · *In progress*
 
 Make the core comfortable for daily, long-form writing.
 
 **Milestones**
-* M2.1 — Scroll synchronization between editor and preview
+* M2.1 — Scroll synchronization between editor and preview *(Done — T-2.1, delivered early during Phase 1)*
 * M2.2 — Document outline (headings) with navigation
 * M2.3 — In-editor search and replace
-* M2.4 — Word count and reading-time indicator
+* M2.4 — Word count and reading-time indicator *(Done — T-2.4)*
 * M2.5 — Word wrap toggle and multiple cursors
 
 **Exit criteria**

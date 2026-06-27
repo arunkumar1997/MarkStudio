@@ -4,7 +4,29 @@
 >
 > Each task has: an **ID**, a **description**, **files involved** (planned paths from [ARCHITECTURE.md](ARCHITECTURE.md)), **dependencies**, and a **complexity** estimate (S / M / L).
 
-The immediate focus is **Phase 1 — Editing Core** ([ROADMAP.md](ROADMAP.md)). The editor (T-104), live preview (T-105), resizable App Shell with layout modes (T-106), Codicon toolbar (T-107), convenience commands + default keybindings (T-108), full cursor / scroll / per-file layout persistence (T-109), external file-change reconciliation (T-110), editor ⇄ preview scroll synchronisation (T-2.1), the reactive configuration service (T-111), the first unit-test harness (T-112), the jsdom integration layer for the webview DOM seams (T-113), the Extension Host lifecycle test layer (T-113b), the CI pipeline (T-120), and lint/format (T-121) are all in place. With the last Phase 1 robustness gap closed, the next move is to start **Phase 2** work or pick up a Nice-to-Have. The single recommended next task is in [AGENT_HANDOFF.md](AGENT_HANDOFF.md) §10.
+The immediate focus is **Phase 2 — Editing Quality** ([ROADMAP.md](ROADMAP.md)). Phase 1 — Editing Core is complete. Within Phase 2, scroll synchronisation (T-2.1, M2.1) shipped early during Phase 1 and the word count & reading-time status-bar indicator (T-2.4, M2.4) is now in place. The remaining Phase 2 milestones are the document outline (M2.2), in-editor search & replace (M2.3), and the word-wrap toggle / multiple cursors (M2.5). The single recommended next task is in [AGENT_HANDOFF.md](AGENT_HANDOFF.md) §10.
+
+---
+
+## High Priority — Phase 2 (Editing Quality)
+
+### T-2.2 · Document outline (headings) with navigation
+* **Description:** A navigable heading outline that updates incrementally as headings change ([ROADMAP.md](ROADMAP.md) M2.2). **Investigate first:** VS Code's native Outline view / breadcrumbs are driven by `vscode.window.activeTextEditor`, which is `undefined` while a custom editor is focused, so a plain `DocumentSymbolProvider` may not surface for the MarkStudio editor. Decide between (a) a host-side `TreeDataProvider` in a view container, or (b) an in-webview outline pane, before implementing.
+* **Files involved:** TBD by the design (e.g. `src/outline/…` host-side, or `src/webview/app/…` webview-side)
+* **Dependencies:** T-105 (preview tokeniser can supply heading positions)
+* **Complexity:** M
+
+### T-2.3 · In-editor search & replace
+* **Description:** Find/replace built on CodeMirror's `@codemirror/search` (already a dependency), themed to `--vscode-*` and reachable by keyboard ([ROADMAP.md](ROADMAP.md) M2.3).
+* **Files involved:** `src/webview/editor/extensions.ts`, `src/webview/editor/createEditor.ts`
+* **Dependencies:** T-104
+* **Complexity:** M
+
+### T-2.5 · Word wrap toggle and multiple cursors
+* **Description:** A word-wrap toggle (likely a new `markstudio.*` setting via the `Compartment` pattern from T-111) and confirmed multi-cursor support ([ROADMAP.md](ROADMAP.md) M2.5).
+* **Files involved:** `src/webview/editor/extensions.ts`, `src/services/ConfigurationService.ts`, `package.json`
+* **Dependencies:** T-104, T-111
+* **Complexity:** S
 
 ---
 
@@ -36,6 +58,7 @@ The immediate focus is **Phase 1 — Editing Core** ([ROADMAP.md](ROADMAP.md)). 
 
 ## Done
 
+* **T-2.4 · Word count and reading-time indicator** — Added a native VS Code status-bar item showing the live word count (e.g. `$(book) 1,234 words`) for the active MarkStudio editor, with a tooltip breaking out words · characters · estimated reading time (~200 wpm, rounded up to ≥ 1 min). Computed entirely host-side from the document the provider already owns (ADR-0001): new pure `src/status/wordCount.ts` (`computeDocumentStats`; a "word" is a Unicode letter/number/mark run with internal apostrophes/hyphens, so Markdown punctuation is excluded) and new `src/status/WordCountStatusBar.ts` (owns the `StatusBarItem`, shows it only while a MarkStudio editor is active, re-counts on edits with a 250 ms debounce). `MarkStudioEditorProvider` gained active-document tracking and a new `onDidChangeActiveDocument` event; `src/extension.ts` wires the indicator to it. 11 new unit tests cover the pure stats function. No new dependency, no protocol change, no webview/bundle-size change. *(2026-06-27 — see [CHANGELOG.md](CHANGELOG.md))*
 * **T-121 · Linting and formatting** — Added a lint/format gate. ESLint (flat config, `eslint.config.mjs`, ESLint 9 + `typescript-eslint`) encodes the lint-able rules from [CODING_GUIDELINES.md](CODING_GUIDELINES.md): recommended TypeScript rules plus `eqeqeq`, no stray `console` (only `warn`/`error`), explicit exported types, and underscore-aware `no-unused-vars`; build output is ignored, the root CommonJS esbuild scripts lint as Node, and test harnesses/mocks relax the exported-type/console rules. Prettier (`.prettierrc.json`: 2-space, double quotes, semicolons, no trailing commas, 80 cols, `endOfLine: auto`) owns formatting with `eslint-config-prettier` applied last; `docs/`/`*.md`/lockfile are ignored. New scripts `npm run lint` (`eslint . --max-warnings 0 && prettier --check .`) and `npm run lint:fix`; the `lint` step joins the CI **build-and-test** job. The existing tree was normalised once (mostly 4-space → 2-space indentation); no behavioural change. Five dev dependencies added (`eslint`, `@eslint/js`, `typescript-eslint`, `prettier`, `eslint-config-prettier`); no runtime dependency or bundle-size change. *(2026-06-27 — see [CHANGELOG.md](CHANGELOG.md))*
 * **T-120 · CI pipeline** — Added a GitHub Actions workflow (`.github/workflows/ci.yml`) that runs on every push to `main` and every pull request, gating merges (a red pipeline blocks merge). Two jobs on `ubuntu-latest`: **build-and-test** (`npm ci` → `npm run lint` → `npm run typecheck` → `npm run build` → `npm test`, the unit + integration layers) and **extension-host-tests** (`npm ci` → `xvfb-run -a npm run test:exthost`, since the Extension Host layer boots a real VS Code that needs a display). The downloaded VS Code build (~280 MB) is cached under `.vscode-test/` keyed on `package-lock.json` so only the first run re-downloads it; the Extension Host job is split out so its heavy download never blocks the fast unit/integration feedback, and `concurrency` cancels superseded runs on the same ref. The `lint` step was wired in with T-121. No app-code, dependency, or bundle-size change. *(2026-06-27 — see [CHANGELOG.md](CHANGELOG.md))*
 * **T-113b · Extension Host lifecycle tests (`@vscode/test-electron`)** — Stood up the genuine Extension Host layer the unit (T-112) and jsdom (T-113) layers cannot reach (ADR-0013). A launcher (`test/exthost/runTests.ts`) boots a real VS Code via `@vscode/test-electron` against this repo + a fresh temp workspace/user-data dir (`--disable-extensions`, `--disable-workspace-trust`); the in-host suite (`test/exthost/index.ts` → `run()`) runs on a minimal hand-rolled registry/runner over `node:assert` (`test/exthost/harness.ts`) — **no Mocha/glob**, consistent with ADR-0005. `esbuild.exthost.js` builds two bundles with different externals (launcher keeps `@vscode/test-electron` external; in-host suite keeps `vscode` external and is never aliased to the mock). The first lifecycle tests assert the host-observable contract: the extension activates, `vscode.openWith` resolves the custom editor without error, an `edit` makes the document dirty and `save` clears it, and revert restores the on-disk content. `npm run test:exthost` builds → bundles → launches; it stays **out** of the default `test` (heavy VS Code download), ready for CI to opt in (T-120). **One new dev dependency** (`@vscode/test-electron`). *(2026-06-27 — see [CHANGELOG.md](CHANGELOG.md))*

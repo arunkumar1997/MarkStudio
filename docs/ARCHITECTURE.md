@@ -82,6 +82,10 @@ src/
 │   ├── ConfigurationService.ts       # reads MarkStudio settings
 │   └── StateStore.ts                 # Memento-backed persistence (workspace/global)
 │
+├── status/                       # Host-side status-bar indicators
+│   ├── wordCount.ts                  # pure computeDocumentStats (words/characters/reading time)
+│   └── WordCountStatusBar.ts         # StatusBarItem reflecting the active MarkStudio document (T-2.4)
+│
 └── webview/                      # Webview (browser) runtime — bundled separately
     ├── main.ts                       # builds the App Shell exactly once; mounts the editor
     ├── app/
@@ -120,6 +124,7 @@ Files are intentionally small and single-purpose. If a file grows past a single 
 | `FileWatcherService` | Detect external file changes via `createFileSystemWatcher` | Implement custom polling — *deferred: the text-backed editor reconciles via the managed `TextDocument` + `onDidChangeTextDocument` (ADR-0009)* |
 | `ConfigurationService` | Read `markstudio.*` settings reactively | Cache settings without listening for changes |
 | `StateStore` | Persist workspace/global state via Memento | Store large blobs or document content |
+| `WordCountStatusBar` | Show word count + reading time for the active MarkStudio document in a native status-bar item (T-2.4) | Add custom webview chrome; recount synchronously on every keystroke |
 
 ### 4.2 Webview
 

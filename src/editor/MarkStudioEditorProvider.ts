@@ -63,7 +63,7 @@ export class MarkStudioEditorProvider
       stateStore,
       configService
     );
-    const disposable = vscode.window.registerCustomEditorProvider(
+    const registration = vscode.window.registerCustomEditorProvider(
       MarkStudioEditorProvider.viewType,
       provider,
       {
@@ -72,10 +72,23 @@ export class MarkStudioEditorProvider
         supportsMultipleEditorsPerDocument: false
       }
     );
+    const disposable = vscode.Disposable.from(
+      registration,
+      provider.activeDocumentEmitter
+    );
     return { provider, disposable };
   }
 
   private activeController: MarkStudioEditorController | null = null;
+  private activeDocument: vscode.TextDocument | null = null;
+  private readonly activeDocumentEmitter =
+    new vscode.EventEmitter<vscode.TextDocument | null>();
+
+  // Fires whenever the active MarkStudio editor changes (including to none, on
+  // blur or dispose). The status-bar word-count indicator (T-2.4) listens here
+  // so it can reflect — and hide for — the focused document.
+  public readonly onDidChangeActiveDocument: vscode.Event<vscode.TextDocument | null> =
+    this.activeDocumentEmitter.event;
 
   private constructor(
     private readonly context: vscode.ExtensionContext,
@@ -85,6 +98,18 @@ export class MarkStudioEditorProvider
 
   public getActiveController(): MarkStudioEditorController | null {
     return this.activeController;
+  }
+
+  public getActiveDocument(): vscode.TextDocument | null {
+    return this.activeDocument;
+  }
+
+  private setActiveDocument(document: vscode.TextDocument | null): void {
+    if (this.activeDocument === document) {
+      return;
+    }
+    this.activeDocument = document;
+    this.activeDocumentEmitter.fire(document);
   }
 
   public resolveCustomTextEditor(
@@ -145,14 +170,24 @@ export class MarkStudioEditorProvider
     );
 
     const controller = new MarkStudioEditorController(bus);
-    if (webviewPanel.active) {
+    const activate = (): void => {
       this.activeController = controller;
+      this.setActiveDocument(textDocument);
+    };
+    const deactivateIfCurrent = (): void => {
+      if (this.activeController === controller) {
+        this.activeController = null;
+        this.setActiveDocument(null);
+      }
+    };
+    if (webviewPanel.active) {
+      activate();
     }
     const viewStateSubscription = webviewPanel.onDidChangeViewState((event) => {
       if (event.webviewPanel.active) {
-        this.activeController = controller;
-      } else if (this.activeController === controller) {
-        this.activeController = null;
+        activate();
+      } else {
+        deactivateIfCurrent();
       }
     });
 
@@ -184,9 +219,7 @@ export class MarkStudioEditorProvider
     });
 
     webviewPanel.onDidDispose(() => {
-      if (this.activeController === controller) {
-        this.activeController = null;
-      }
+      deactivateIfCurrent();
       viewStateSubscription.dispose();
       changeSubscription.dispose();
       configSubscription.dispose();
