@@ -32,7 +32,7 @@
 | ------- | ------ | ----------- |
 | Scroll synchronization | Shipped | Editor and preview scroll positions stay aligned, both directions (T-2.1; delivered early during Phase 1). |
 | Document outline | Planned | Navigable heading outline that updates incrementally. |
-| Search & replace | Planned | In-editor find/replace built on CodeMirror's search. |
+| Search & replace | Shipped | In-editor find/replace built on CodeMirror's `@codemirror/search`: the panel mounts at the top (like VS Code's find widget), opens with `Ctrl/Cmd+F`, supports replace, match-case, regexp, and whole-word, and is themed entirely via `--vscode-*` variables (T-2.3). |
 | Word count & reading time | Shipped | Native status-bar indicator showing live word count for the active MarkStudio editor; tooltip adds characters and estimated reading time (~200 wpm). Computed host-side from the document; debounced; no custom UI (T-2.4). |
 | Word wrap & multiple cursors | Planned | Wrap toggle and multi-cursor editing. |
 

@@ -56,7 +56,7 @@ Make the core comfortable for daily, long-form writing.
 **Milestones**
 * M2.1 — Scroll synchronization between editor and preview *(Done — T-2.1, delivered early during Phase 1)*
 * M2.2 — Document outline (headings) with navigation
-* M2.3 — In-editor search and replace
+* M2.3 — In-editor search and replace *(Done — T-2.3)*
 * M2.4 — Word count and reading-time indicator *(Done — T-2.4)*
 * M2.5 — Word wrap toggle and multiple cursors
 

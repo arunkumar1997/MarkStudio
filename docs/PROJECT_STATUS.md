@@ -6,20 +6,20 @@
 
 ## 1. Snapshot
 
-* **Current phase:** **Phase 2 — Editing Quality, started.** Phase 1 — Editing Core is complete.
-* **Current milestone:** **T-2.4 — Word count & reading-time indicator (M2.4) Done.** A native VS Code status-bar item now shows the live word count for the active MarkStudio editor (e.g. `$(book) 1,234 words`), with a tooltip breaking out words · characters · estimated reading time (~200 wpm). The count is computed entirely host-side from the document the provider already owns (ADR-0001) — no webview message, DOM, or custom chrome, per "prefer VS Code integration; less UI is better." This is the first feature implemented as a Phase 2 item (scroll sync, M2.1, was delivered early during Phase 1 as T-2.1).
-* **Overall completion (qualitative):** Phase 0: 100%. Phase 1: 100%. Phase 2: ~40% by milestone (M2.1 scroll sync + M2.4 word count done; M2.2 outline, M2.3 search & replace, M2.5 word-wrap toggle / multi-cursor remain).
-* **Last updated:** 2026-06-27 by the T-2.4 session
+* **Current phase:** **Phase 2 — Editing Quality, in progress.** Phase 1 — Editing Core is complete.
+* **Current milestone:** **T-2.3 — In-editor search & replace (M2.3) Done.** CodeMirror's find/replace panel is now wired into the source editor (`search({ top: true })`) and themed to the VS Code find widget entirely through `--vscode-*` variables. `Ctrl/Cmd+F` opens find; the panel's replace field and checkboxes drive replace, match-case, regexp, and whole-word; `Enter`/`F3` step through matches. The feature is fully webview-contained — no host code, no protocol change, no new dependency (`@codemirror/search` has been bundled since T-104).
+* **Overall completion (qualitative):** Phase 0: 100%. Phase 1: 100%. Phase 2: ~60% by milestone (M2.1 scroll sync + M2.3 search & replace + M2.4 word count done; M2.2 outline and M2.5 word-wrap toggle / multi-cursor remain).
+* **Last updated:** 2026-06-27 by the T-2.3 session
 * **Last commit on `main`:** *(repository is under git; changes from this session are uncommitted)*
 
 ---
 
 ## 2. Current Focus
 
-* **Active initiative:** **Phase 2 — Editing Quality.** T-2.4 lands the word-count + reading-time status-bar indicator. New host-side `src/status/wordCount.ts` holds the pure `computeDocumentStats` (words/characters/reading minutes); new `src/status/WordCountStatusBar.ts` owns the `StatusBarItem`, shows it only while a MarkStudio editor is active, and re-counts on edits with a 250 ms debounce so typing never blocks on the count for a large file. `MarkStudioEditorProvider` gained active-document tracking (parallel to its existing active-controller tracking) and a new `onDidChangeActiveDocument` event; `src/extension.ts` wires the indicator to it. **No new dependency, no protocol change, no webview/bundle-size change.**
-* **Owner (current agent):** T-2.4 session
+* **Active initiative:** **Phase 2 — Editing Quality.** T-2.3 lands in-editor search & replace. `src/webview/editor/extensions.ts` adds the `search({ top: true })` extension (the panel mounts at the top, mirroring VS Code's find widget) alongside the already-bound `searchKeymap`, and extends the editor theme with find-panel selectors (`.cm-panels`, `.cm-panel.cm-search` inputs/buttons/close) keyed to `--vscode-editorWidget-*`, `--vscode-input-*`, `--vscode-button-secondary*`, and `--vscode-focusBorder`. **No new dependency, no protocol change, no host change.**
+* **Owner (current agent):** T-2.3 session
 * **Started:** 2026-06-27
-* **Target outcome:** Begin Phase 2; the next milestone is in-editor search & replace (M2.3 / T-2.3) or the document outline (M2.2 / T-2.2) — see [TODO.md](TODO.md).
+* **Target outcome:** The remaining Phase 2 milestones are the document outline (M2.2 / T-2.2 — needs a design decision) and the word-wrap toggle / multiple cursors (M2.5 / T-2.5) — see [TODO.md](TODO.md).
 
 ---
 
@@ -42,6 +42,7 @@ User-visible features that are shipped and stable.
 | Editor ⇄ preview scroll synchronisation (Phase 2 M2.1) | 1/2 | Unreleased (T-2.1) |
 | Reactive configuration service — `markstudio.editor.lineNumbers` toggles the CM6 line-number gutter via a `Compartment` (ADR-0010) | 1 | Unreleased (T-111) |
 | **Word count & reading-time status-bar indicator (Phase 2 M2.4)** — native status-bar item showing live word count for the active MarkStudio editor; tooltip adds characters + estimated reading time; computed host-side, debounced, no custom UI | 2 | Unreleased (T-2.4) |
+| **In-editor search & replace (Phase 2 M2.3)** — CodeMirror find/replace panel mounted at the top of the editor; `Ctrl/Cmd+F` to find, replace field + match-case / regexp / whole-word checkboxes; themed entirely to the VS Code find widget via `--vscode-*` variables | 2 | Unreleased (T-2.3) |
 
 For details, see [FEATURES.md](FEATURES.md).
 
@@ -51,7 +52,7 @@ For details, see [FEATURES.md](FEATURES.md).
 
 | Item | State | Owner | Notes |
 | ---- | ----- | ----- | ----- |
-| *(none — T-2.4 closed)* | — | — | Phase 2 is underway; next is M2.3 (search & replace) or M2.2 (outline) |
+| *(none — T-2.3 closed)* | — | — | Phase 2 is underway; next is M2.2 (outline, needs a design note) or M2.5 (word-wrap toggle / multi-cursor) |
 
 ---
 
@@ -65,6 +66,7 @@ For details, see [FEATURES.md](FEATURES.md).
 
 | Issue | Severity | Workaround | Tracked in |
 | ----- | -------- | ---------- | ---------- |
+| The find panel is keyboard-driven only; there is no toolbar/Codicon button to open it yet | Low | `Ctrl/Cmd+F` while the editor is focused | T-2.3 follow-ups / Toolbar (T-107) |
 | Word count treats a run of script without spaces (e.g. CJK) as a single "word", so prose in those scripts is undercounted | Low | N/A — acceptable for an estimate; per-character CJK counting is a possible future refinement | T-2.4 follow-ups |
 | Document outline (M2.2) is not yet implemented; VS Code's native Outline/breadcrumbs are driven by `activeTextEditor`, which is `undefined` for custom editors, so a plain `DocumentSymbolProvider` may not surface — needs a design decision | Expected | N/A — pending T-2.2 | T-2.2 |
 | The Extension Host layer asserts only host-observable behaviour; webview-internal handshake, focus, and pixel/scroll geometry stay in the manual matrix | Expected | Manual verification in the EDH | T-113b / ADR-0013 follow-ups |
@@ -89,7 +91,7 @@ For details, see [FEATURES.md](FEATURES.md).
 
 ## 8. Health Checks
 
-* [x] Build is green — `npm run build` produces `dist/extension.js` (18.4 KB dev / ~7 KB production-minified, +~0.3 KB for the status-bar wiring), `dist/webview.js` (~699.6 KB production-minified, **unchanged** — this feature is host-only), and the Codicons assets
+* [x] Build is green — `npm run build` produces `dist/extension.js`, `dist/webview.js`, and the Codicons assets; production-minified webview is **~701.4 KB** (+~2 KB for the search panel + theming), host bundle **unchanged** (webview-only feature)
 * [x] Typecheck is green — `npm run typecheck` (strict) **and** `npm run typecheck:test` (strict, incl. tests) pass
 * [x] Tests are green — `npm test` runs **61 tests** (53 unit + 8 integration, `node:test`); the Extension Host lifecycle layer (`npm run test:exthost`, 4 tests) runs separately. CI runs all three layers on push/PR
 * [x] Lint is green — `npm run lint` (ESLint `--max-warnings 0` + `prettier --check .`) clean
@@ -102,20 +104,18 @@ For details, see [FEATURES.md](FEATURES.md).
 
 ## 9. Recently Completed (Last Session)
 
-* Implemented **T-2.4 — Word count & reading-time indicator** (first Phase 2 feature):
-  * New pure `src/status/wordCount.ts` — `computeDocumentStats(text)` → `{ words, characters, readingMinutes }`; a "word" is a Unicode letter/number/mark run with internal apostrophes/hyphens, so Markdown punctuation is excluded; reading time is `ceil(words / 200)`, ≥ 1 min for any prose, 0 for empty.
-  * New `src/status/WordCountStatusBar.ts` — owns a right-aligned `StatusBarItem`, shows it only while a MarkStudio editor is active, hides it otherwise, and re-counts on edits to the active document with a 250 ms debounce.
-  * `MarkStudioEditorProvider` — added active-document tracking and a new `onDidChangeActiveDocument` event (the emitter is disposed via the registration disposable); `src/extension.ts` constructs the indicator and subscribes it to the event.
-  * 11 new unit tests for `computeDocumentStats` (`test/status/wordCount.test.ts`).
-  * Documentation pass: [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md), [ROADMAP.md](ROADMAP.md) (Phase 2 → In progress; M2.1 + M2.4 → Done), [ARCHITECTURE.md](ARCHITECTURE.md) (new `src/status/` module), [TODO.md](TODO.md) (Phase 2 backlog seeded; T-2.4 → Done), this file, and [AGENT_HANDOFF.md](AGENT_HANDOFF.md).
-  * **No runtime dependency, no protocol change, no webview/bundle-size change.** `npm run lint`, `npm run typecheck`, `npm run typecheck:test`, `npm run build`, and `npm test` (53 unit + 8 integration) are all green locally.
+* Implemented **T-2.3 — In-editor search & replace** (Phase 2 milestone M2.3):
+  * `src/webview/editor/extensions.ts` — added `search({ top: true })` so the CodeMirror find/replace panel mounts at the top of the editor (mirroring VS Code's find widget); the already-bound `searchKeymap` activates it (`Ctrl/Cmd+F`, `F3`, etc.).
+  * Extended the editor theme with find-panel selectors (`.cm-panels`, `.cm-panel.cm-search` text inputs, buttons, and the close affordance) keyed entirely to `--vscode-editorWidget-*`, `--vscode-input-*`, `--vscode-button-secondary*`, and `--vscode-focusBorder`, so the panel is theme-correct in light/dark/high-contrast (ADR-0004).
+  * Documentation pass: [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) (Search & replace → Shipped), [ROADMAP.md](ROADMAP.md) (M2.3 → Done), [TODO.md](TODO.md) (T-2.3 → Done), this file, and [AGENT_HANDOFF.md](AGENT_HANDOFF.md).
+  * **No runtime dependency, no protocol change, no host change.** `npm run lint`, `npm run typecheck`, `npm run typecheck:test`, `npm run build`, and `npm test` (53 unit + 8 integration) are all green locally.
 
 ---
 
 ## 10. Recommended Next Task
 
-* **Task:** Continue **Phase 2 — Editing Quality**. The two strongest next candidates are **T-2.3 — In-editor search & replace** (M2.3; builds directly on the already-bundled `@codemirror/search`, fully webview-contained, low risk) or **T-2.2 — Document outline** (M2.2; higher value but needs an upfront design decision because VS Code's native Outline view does not surface for custom editors — see [TODO.md](TODO.md)).
-* **Why:** Search & replace is the lowest-risk high-value next step; the outline is the headline Phase 2 exit criterion but warrants a design note first.
+* **Task:** Continue **Phase 2 — Editing Quality**. The two remaining milestones are **T-2.5 — Word-wrap toggle and multiple cursors** (M2.5; small, low-risk — a new `markstudio.*` setting via the `Compartment` pattern from T-111 plus confirming multi-cursor) or **T-2.2 — Document outline** (M2.2; the headline Phase 2 exit criterion, but it needs an upfront design decision because VS Code's native Outline view does not surface for custom editors).
+* **Why:** T-2.5 is the lowest-risk next step and reuses the established settings/compartment pattern; T-2.2 is higher value but warrants a design note (host `TreeDataProvider` vs. in-webview pane) and likely an ADR first.
 * **Suggested prompt:** [.ai/PROMPTS/feature.md](../.ai/PROMPTS/feature.md).
 
 ---

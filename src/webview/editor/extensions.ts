@@ -32,7 +32,11 @@ import {
   indentOnInput,
   syntaxHighlighting
 } from "@codemirror/language";
-import { highlightSelectionMatches, searchKeymap } from "@codemirror/search";
+import {
+  highlightSelectionMatches,
+  search,
+  searchKeymap
+} from "@codemirror/search";
 import { tags } from "@lezer/highlight";
 import type { MarkStudioConfig } from "../../messaging/messages";
 
@@ -118,6 +122,66 @@ const markstudioTheme = EditorView.theme({
   },
   ".cm-selectionMatch": {
     backgroundColor: "var(--vscode-editor-selectionHighlightBackground)"
+  },
+  // Find/replace panel (T-2.3). The CodeMirror search panel is themed to the
+  // VS Code find-widget surface so it reads as part of the host, not a
+  // bolted-on control. Everything keys to `--vscode-*` variables (ADR-0004).
+  ".cm-panels": {
+    backgroundColor: "var(--vscode-editorWidget-background)",
+    color:
+      "var(--vscode-editorWidget-foreground, var(--vscode-editor-foreground))",
+    fontFamily: "var(--vscode-font-family)",
+    fontSize: "var(--vscode-font-size, 13px)"
+  },
+  ".cm-panels.cm-panels-top": {
+    borderBottom:
+      "1px solid var(--vscode-editorWidget-border, var(--vscode-widget-border, transparent))"
+  },
+  ".cm-panel.cm-search": {
+    padding: "4px 6px"
+  },
+  ".cm-panel.cm-search label": {
+    fontSize: "var(--vscode-font-size, 13px)"
+  },
+  ".cm-panel.cm-search input[name=search], .cm-panel.cm-search input[name=replace]":
+    {
+      backgroundColor: "var(--vscode-input-background)",
+      color: "var(--vscode-input-foreground)",
+      border: "1px solid var(--vscode-input-border, transparent)",
+      borderRadius: "2px",
+      padding: "2px 4px"
+    },
+  ".cm-panel.cm-search input[name=search]:focus, .cm-panel.cm-search input[name=replace]:focus":
+    {
+      outline: "1px solid var(--vscode-focusBorder)",
+      outlineOffset: "-1px"
+    },
+  ".cm-panel.cm-search button:not([name=close]), .cm-button": {
+    backgroundColor:
+      "var(--vscode-button-secondaryBackground, var(--vscode-button-background))",
+    color:
+      "var(--vscode-button-secondaryForeground, var(--vscode-button-foreground))",
+    border: "1px solid var(--vscode-button-border, transparent)",
+    borderRadius: "2px",
+    padding: "2px 8px",
+    backgroundImage: "none"
+  },
+  ".cm-panel.cm-search button:not([name=close]):hover, .cm-button:hover": {
+    backgroundColor:
+      "var(--vscode-button-secondaryHoverBackground, var(--vscode-toolbar-hoverBackground))"
+  },
+  ".cm-panel.cm-search button:focus-visible, .cm-button:focus-visible": {
+    outline: "1px solid var(--vscode-focusBorder)",
+    outlineOffset: "1px"
+  },
+  ".cm-panel.cm-search [name=close]": {
+    color:
+      "var(--vscode-icon-foreground, var(--vscode-editorWidget-foreground))",
+    cursor: "pointer",
+    borderRadius: "3px"
+  },
+  ".cm-panel.cm-search [name=close]:hover": {
+    backgroundColor: "var(--vscode-toolbar-hoverBackground)"
   }
 });
 
@@ -135,6 +199,9 @@ export function buildExtensions(config: MarkStudioConfig): Extension[] {
     rectangularSelection(),
     crosshairCursor(),
     highlightSelectionMatches(),
+    // The find/replace panel mounts at the top, mirroring VS Code's find
+    // widget; `searchKeymap` (below) binds Ctrl/Cmd+F, F3, etc. (T-2.3).
+    search({ top: true }),
     markdown(),
     syntaxHighlighting(markstudioHighlight),
     EditorView.lineWrapping,
