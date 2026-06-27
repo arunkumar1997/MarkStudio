@@ -1,0 +1,153 @@
+{
+  "name": "markstudio",
+  "displayName": "MarkStudio",
+  "description": "A native, Obsidian-inspired Markdown editor for Visual Studio Code.",
+  "version": "0.0.1",
+  "publisher": "markstudio",
+  "license": "MIT",
+  "private": true,
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "markdown",
+    "editor",
+    "preview",
+    "custom editor"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "customEditors": [
+      {
+        "viewType": "markstudio.editor",
+        "displayName": "MarkStudio",
+        "selector": [
+          {
+            "filenamePattern": "*.md"
+          }
+        ],
+        "priority": "option"
+      }
+    ],
+    "commands": [
+      {
+        "command": "markstudio.openMarkStudio",
+        "title": "Open in MarkStudio",
+        "category": "MarkStudio",
+        "enablement": "editorLangId == markdown"
+      },
+      {
+        "command": "markstudio.layout.showSplit",
+        "title": "Show Editor and Preview",
+        "category": "MarkStudio"
+      },
+      {
+        "command": "markstudio.layout.showEditorOnly",
+        "title": "Show Editor Only",
+        "category": "MarkStudio"
+      },
+      {
+        "command": "markstudio.layout.showPreviewOnly",
+        "title": "Show Preview Only",
+        "category": "MarkStudio"
+      },
+      {
+        "command": "markstudio.togglePreview",
+        "title": "Toggle Preview",
+        "category": "MarkStudio"
+      },
+      {
+        "command": "markstudio.toggleSplit",
+        "title": "Toggle Split View",
+        "category": "MarkStudio"
+      },
+      {
+        "command": "markstudio.focusEditor",
+        "title": "Focus Editor",
+        "category": "MarkStudio"
+      },
+      {
+        "command": "markstudio.focusPreview",
+        "title": "Focus Preview",
+        "category": "MarkStudio"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "markstudio.togglePreview",
+        "key": "ctrl+k v",
+        "mac": "cmd+k v",
+        "when": "activeCustomEditorId == 'markstudio.editor'"
+      },
+      {
+        "command": "markstudio.toggleSplit",
+        "key": "ctrl+k ctrl+v",
+        "mac": "cmd+k cmd+v",
+        "when": "activeCustomEditorId == 'markstudio.editor'"
+      },
+      {
+        "command": "markstudio.focusEditor",
+        "key": "ctrl+k ctrl+e",
+        "mac": "cmd+k cmd+e",
+        "when": "activeCustomEditorId == 'markstudio.editor'"
+      },
+      {
+        "command": "markstudio.focusPreview",
+        "key": "ctrl+k ctrl+r",
+        "mac": "cmd+k cmd+r",
+        "when": "activeCustomEditorId == 'markstudio.editor'"
+      }
+    ],
+    "configuration": {
+      "title": "MarkStudio",
+      "properties": {
+        "markstudio.editor.lineNumbers": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "Show line numbers in the MarkStudio source editor."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build -- --production",
+    "build": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "typecheck": "tsc --noEmit",
+    "typecheck:test": "tsc -p tsconfig.test.json",
+    "compile": "npm run typecheck && npm run build",
+    "test:unit": "node esbuild.test.js && node --test dist-test/tests.cjs",
+    "test:integration": "node esbuild.integration.js && node --test dist-test/integration.cjs",
+    "test:exthost": "npm run build && node esbuild.exthost.js && node dist-test/exthost-runner.cjs",
+    "test": "npm run typecheck:test && npm run test:unit && npm run test:integration "
+  },
+  "dependencies": {
+    "@codemirror/commands": "^6.6.0",
+    "@codemirror/lang-markdown": "^6.2.5",
+    "@codemirror/language": "^6.10.2",
+    "@codemirror/search": "^6.5.6",
+    "@codemirror/state": "^6.4.1",
+    "@codemirror/view": "^6.28.0",
+    "@lezer/highlight": "^1.2.0",
+    "markdown-it": "^14.2.0"
+  },
+  "devDependencies": {
+    "@types/jsdom": "^28.0.3",
+    "@types/markdown-it": "^14.1.2",
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/codicons": "^0.0.45",
+    "@vscode/test-electron": "^2.5.2",
+    "esbuild": "^0.20.2",
+    "jsdom": "^29.1.1",
+    "typescript": "^5.4.5"
+  },
+  "allowScripts": {
+    "esbuild@0.20.2": true
+  }
+}

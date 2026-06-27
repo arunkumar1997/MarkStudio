@@ -1,0 +1,84 @@
+# Continuous Integration for MarkStudio (T-120).
+#
+# Runs the build and every available automated test layer on push and pull
+# request. A red pipeline blocks merge (TESTING.md §7).
+#
+# Test layers (TESTING.md §2):
+#   * Unit + integration (`npm test`) — fast, host-free / jsdom; run everywhere.
+#   * Extension Host lifecycle (`npm run test:exthost`) — boots a real VS Code via
+#     `@vscode/test-electron`, so it needs a display. We run it on Linux under
+#     `xvfb-run` and cache the downloaded VS Code under `.vscode-test/`.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel superseded runs on the same ref to save CI minutes.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build, type-check, unit + integration tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check (source)
+        run: npm run typecheck
+
+      - name: Build bundles
+        run: npm run build
+
+      - name: Unit + integration tests
+        run: npm test
+
+  extension-host-tests:
+    name: Extension Host lifecycle tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Cache the VS Code build downloaded by @vscode/test-electron (~280 MB)
+      # so subsequent runs do not re-download it. Keyed on the lockfile so a
+      # version bump invalidates the cache.
+      - name: Cache VS Code test build
+        uses: actions/cache@v4
+        with:
+          path: .vscode-test
+          key: vscode-test-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            vscode-test-${{ runner.os }}-
+
+      # The Extension Host suite launches a real VS Code, which needs a display.
+      # `xvfb-run` provides a virtual framebuffer on the headless Linux runner.
+      - name: Extension Host tests (xvfb)
+        run: xvfb-run -a npm run test:exthost

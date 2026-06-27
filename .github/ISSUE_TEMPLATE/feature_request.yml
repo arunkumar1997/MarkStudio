@@ -1,0 +1,53 @@
+name: Feature request
+description: Propose a feature or enhancement for MarkStudio
+title: "feat: <short description>"
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before proposing a feature, check it fits the roadmap and philosophy:
+        docs/ROADMAP.md, docs/FEATURES.md, and .ai/CONTEXT.md.
+        Features must not require a UI/CSS framework, hardcoded colors, or fake VS Code chrome.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / user value
+      description: What problem does this solve, and for whom?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the feature. Note entry points (command, toolbar, keybinding) and configuration.
+    validations:
+      required: true
+  - type: dropdown
+    id: phase
+    attributes:
+      label: Roadmap phase this belongs to
+      description: See docs/ROADMAP.md. Do not pull features forward across phases.
+      options:
+        - Phase 1 — Editing Core
+        - Phase 2 — Editing Quality
+        - Phase 3 — Modern Markdown
+        - Phase 4 — Knowledge Management
+        - Phase 5 — Authoring Workflows
+        - Phase 6 — Platform
+        - Unsure
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: compliance
+    attributes:
+      label: Compliance
+      options:
+        - label: This does not require a UI or CSS framework, hardcoded colors, or fake VS Code chrome.
+          required: true
+        - label: This can be styled entirely with `--vscode-*` theme variables.
+          required: true

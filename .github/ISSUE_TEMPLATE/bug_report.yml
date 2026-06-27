@@ -1,0 +1,53 @@
+name: Bug report
+description: Report a defect in MarkStudio
+title: "bug: <short description>"
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug. Bugs are the single source of truth for defects
+        (see docs/CONTRIBUTING.md). Please complete the fields below.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Minimal, deterministic steps. Include a sample `.md` snippet if relevant.
+      placeholder: |
+        1. Open a `.md` file with MarkStudio
+        2. ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: input
+    id: vscode-version
+    attributes:
+      label: VS Code version
+    validations:
+      required: true
+  - type: input
+    id: markstudio-version
+    attributes:
+      label: MarkStudio version
+  - type: dropdown
+    id: theme
+    attributes:
+      label: Active theme kind
+      options:
+        - Dark
+        - Light
+        - High Contrast
+        - Other / third-party
+  - type: textarea
+    id: console
+    attributes:
+      label: Errors (webview console / extension host)
+      description: Paste any errors. Open the webview DevTools and the Output panel.
+      render: text

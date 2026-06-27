@@ -1,0 +1,143 @@
+# ROADMAP
+
+> The phased plan for MarkStudio. Phases are intentionally sequenced: a rock-solid editing core first, modern syntax next, knowledge-management features last. **Do not pull features forward across phases** — a weak early phase poisons every later one ([.ai/CONTEXT.md](../.ai/CONTEXT.md) §7).
+>
+> The canonical phase list is in [.ai/PROJECT_SPEC.md](../.ai/PROJECT_SPEC.md). This document adds milestones, exit criteria, and status. Feature detail lives in [FEATURES.md](FEATURES.md); the active backlog lives in [TODO.md](TODO.md).
+
+---
+
+## Status Legend
+
+`Done` · `In progress` · `Next` · `Planned`
+
+---
+
+## Phase 0 — Initialization · *Done*
+
+Establish the project's foundation before any feature work.
+
+**Milestones**
+* M0.1 — `.ai/` guidance authored *(Done — pre-existing)*
+* M0.2 — `docs/` single source of truth established and consistency-reviewed *(Done)*
+* M0.3 — Extension scaffolding: manifest, TypeScript, bundler, Custom Editor registration *(Done — T-101, T-102, T-103)*
+
+**Exit criteria**
+* Documentation is complete and internally consistent. *(Met)*
+* `npm install` and `npm run build` succeed. *(Met — T-101)*
+* Opening a `.md` file can offer MarkStudio as an editor. *(Met — registered via `customEditors`, available through "Reopen Editor With…")*
+
+---
+
+## Phase 1 — Editing Core · *In progress*
+
+A native Markdown editor with split view and live preview. Nothing flashy — just unshakeable.
+
+**Milestones**
+* M1.1 — Custom editor opens `.md` in a persistent webview (one per editor instance, retained when hidden) *(Done — T-101…T-104)*
+* M1.2 — CodeMirror 6 source editor with Markdown syntax highlighting, lists, headings, blockquotes, code blocks, tables, checkboxes *(Done — T-104)*
+* M1.3 — markdown-it live preview with **incremental** DOM patching *(Done — T-105)*
+* M1.4 — Split / Editor-only / Preview-only layout modes with remembered split ratio *(Done — T-106)*
+* M1.5 — Document lifecycle: dirty state, save/revert, undo/redo, hot-exit *(Done for edit path — T-102, T-104; hot-exit verification outstanding)*
+* M1.6 — State persistence: cursor, scroll, split ratio, preview visibility
+* M1.7 — Core commands: Open MarkStudio, Toggle Preview, Toggle Split, Focus Editor, Focus Preview
+
+**Exit criteria**
+* Webview is never recreated on tab switch; CodeMirror state preserved.
+* Preview patches the DOM (verified in DevTools); no full re-render on keystroke.
+* Verified in dark, light, and high-contrast themes.
+* Smooth on a ≥ 1 MB Markdown file.
+
+---
+
+## Phase 2 — Editing Quality · *Planned*
+
+Make the core comfortable for daily, long-form writing.
+
+**Milestones**
+* M2.1 — Scroll synchronization between editor and preview
+* M2.2 — Document outline (headings) with navigation
+* M2.3 — In-editor search and replace
+* M2.4 — Word count and reading-time indicator
+* M2.5 — Word wrap toggle and multiple cursors
+
+**Exit criteria**
+* Scroll sync feels natural in both directions without jitter.
+* Outline updates incrementally as headings change.
+
+---
+
+## Phase 3 — Modern Markdown · *Planned*
+
+The syntax extensions that make Markdown feel modern. Each attaches as a CodeMirror 6 extension and/or markdown-it plugin and **degrades gracefully** when disabled.
+
+**Milestones**
+* M3.1 — Math rendering (inline and block)
+* M3.2 — Mermaid diagrams
+* M3.3 — Callouts / admonitions
+* M3.4 — Wiki-style links (`[[...]]`)
+* M3.5 — Footnotes and GFM completeness (tables, task lists, strikethrough)
+
+**Exit criteria**
+* Every feature is individually toggleable via configuration.
+* Disabling a feature never breaks rendering or the editor.
+
+---
+
+## Phase 4 — Knowledge Management · *Planned*
+
+Begin the PKM layer — only after the core is unshakeable.
+
+**Milestones**
+* M4.1 — Backlinks panel
+* M4.2 — Hover preview for links
+* M4.3 — Embedded notes / transclusion
+* M4.4 — Graph view
+
+**Exit criteria**
+* Link indexing scales to a large workspace without blocking the UI.
+
+---
+
+## Phase 5 — Authoring Workflows · *Planned*
+
+Productivity features for habitual writers.
+
+**Milestones**
+* M5.1 — Templates
+* M5.2 — Snippets
+* M5.3 — Daily notes
+* M5.4 — Workspace-level note features
+
+---
+
+## Phase 6 — Platform · *Planned*
+
+Open MarkStudio for extension by others, once everything beneath is stable.
+
+**Milestones**
+* M6.1 — Plugin API
+* M6.2 — Theme API (within VS Code theming constraints)
+* M6.3 — Custom Markdown extension points
+* M6.4 — Third-party integrations
+
+---
+
+## Cross-Phase Commitments
+
+These hold in **every** phase and are verified continuously:
+
+* Native VS Code feel; no fake chrome.
+* Single persistent webview; CodeMirror and preview never recreated.
+* Incremental preview patching only.
+* Theme-variable styling; light/dark/high-contrast correctness.
+* Keyboard-first; every action reachable without the mouse.
+* Documentation updated in the same change as the code.
+
+---
+
+## How Milestones Become Work
+
+1. A milestone is broken into prioritized tasks in [TODO.md](TODO.md).
+2. Non-trivial features get a design note in [design/](design/) and a durable record in [implementation/](implementation/) (from [.ai/TEMPLATES/FEATURE.md](../.ai/TEMPLATES/FEATURE.md)).
+3. Architectural choices are recorded as ADRs in [DECISIONS.md](DECISIONS.md).
+4. User-facing changes are logged in [CHANGELOG.md](CHANGELOG.md).
