@@ -23,7 +23,11 @@ const CONFIG: MarkStudioConfig = {
   math: true,
   mermaid: true,
   callouts: true,
-  wikiLinks: true
+  wikiLinks: true,
+  footnotes: true,
+  taskLists: true,
+  tables: true,
+  strikethrough: true
 };
 
 describe("createEditor — host/local edit seam", () => {

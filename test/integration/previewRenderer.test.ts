@@ -24,7 +24,11 @@ const CONFIG: MarkStudioConfig = {
   math: true,
   mermaid: true,
   callouts: true,
-  wikiLinks: true
+  wikiLinks: true,
+  footnotes: true,
+  taskLists: true,
+  tables: true,
+  strikethrough: true
 };
 
 // The renderer debounces updates by 40 ms; wait past that to read the result.
@@ -315,7 +319,7 @@ describe("createPreviewRenderer — callout rendering (T-3.3)", () => {
     );
     assert.match(
       callout?.querySelector(".markstudio-callout-title-text")?.textContent ??
-      "",
+        "",
       /Note/
     );
     assert.match(callout?.textContent ?? "", /Body text\./);
@@ -488,5 +492,302 @@ describe("createPreviewRenderer — wiki-link rendering (T-3.4)", () => {
     );
     const link = root().querySelector("a");
     assert.equal(link?.getAttribute("href"), "https://example.com");
+  });
+});
+
+describe("createPreviewRenderer — footnote rendering (T-3.5)", () => {
+  let container: HTMLElement;
+  let renderer: PreviewRenderer | null;
+
+  beforeEach(() => {
+    container = createContainer();
+    renderer = null;
+  });
+
+  afterEach(() => {
+    renderer?.destroy();
+    removeContainer(container);
+  });
+
+  function root(): HTMLElement {
+    const el = container.querySelector(".markstudio-preview-content");
+    assert.ok(el, "preview root should exist");
+    return el as HTMLElement;
+  }
+
+  it("renders a footnote reference and definition when footnotes are on", async () => {
+    renderer = createPreviewRenderer(container, CONFIG);
+    renderer.update("Here is a note.[^1]\n\n[^1]: The footnote text.");
+    await flush();
+
+    const ref = root().querySelector(".footnote-ref");
+    assert.ok(
+      ref,
+      "a footnote reference superscript should be emitted when on"
+    );
+    const section = root().querySelector("section.footnotes");
+    assert.ok(section, "a footnotes section should be emitted when on");
+    assert.match(section?.textContent ?? "", /The footnote text\./);
+    assert.ok(
+      root().querySelector(".footnote-backref"),
+      "a back-reference link should be emitted in the footnotes section"
+    );
+  });
+
+  it("leaves [^1] as literal text when footnotes are disabled", async () => {
+    renderer = createPreviewRenderer(container, {
+      ...CONFIG,
+      footnotes: false
+    });
+    renderer.update("Here is a note.[^1]\n\n[^1]: The footnote text.");
+    await flush();
+
+    assert.equal(
+      root().querySelector(".footnote-ref"),
+      null,
+      "no footnote reference should render when footnotes are off"
+    );
+    assert.equal(
+      root().querySelector("section.footnotes"),
+      null,
+      "no footnotes section should render when footnotes are off"
+    );
+    assert.match(root().textContent ?? "", /\[\^1\]/);
+  });
+
+  it("re-renders live when the footnotes setting is toggled via setConfig", async () => {
+    renderer = createPreviewRenderer(container, {
+      ...CONFIG,
+      footnotes: false
+    });
+    renderer.update("A note.[^1]\n\n[^1]: Text.");
+    await flush();
+    assert.equal(root().querySelector(".footnote-ref"), null);
+
+    renderer.setConfig({ ...CONFIG, footnotes: true });
+    await flush();
+    assert.ok(
+      root().querySelector(".footnote-ref"),
+      "toggling footnotes on should render the reference without a new update"
+    );
+  });
+});
+
+describe("createPreviewRenderer — task-list rendering (T-3.5)", () => {
+  let container: HTMLElement;
+  let renderer: PreviewRenderer | null;
+
+  beforeEach(() => {
+    container = createContainer();
+    renderer = null;
+  });
+
+  afterEach(() => {
+    renderer?.destroy();
+    removeContainer(container);
+  });
+
+  function root(): HTMLElement {
+    const el = container.querySelector(".markstudio-preview-content");
+    assert.ok(el, "preview root should exist");
+    return el as HTMLElement;
+  }
+
+  it("renders disabled checkboxes for task-list items when task lists are on", async () => {
+    renderer = createPreviewRenderer(container, CONFIG);
+    renderer.update("- [ ] Todo\n- [x] Done");
+    await flush();
+
+    const checkboxes = root().querySelectorAll(
+      "input.markstudio-task-list-checkbox"
+    );
+    assert.equal(checkboxes.length, 2, "both items should get a checkbox");
+    const [first, second] = Array.from(checkboxes) as HTMLInputElement[];
+    assert.equal(first.disabled, true, "checkboxes should be read-only");
+    assert.equal(first.checked, false, "[ ] should be unchecked");
+    assert.equal(second.checked, true, "[x] should be checked");
+    assert.ok(
+      root().querySelector("li.markstudio-task-list-item"),
+      "the list item should carry the task-list-item class"
+    );
+    assert.match(root().textContent ?? "", /Todo/);
+  });
+
+  it("leaves [ ] as literal text when task lists are disabled", async () => {
+    renderer = createPreviewRenderer(container, {
+      ...CONFIG,
+      taskLists: false
+    });
+    renderer.update("- [ ] Todo\n- [x] Done");
+    await flush();
+
+    assert.equal(
+      root().querySelector("input.markstudio-task-list-checkbox"),
+      null,
+      "no checkbox should render when task lists are off"
+    );
+    assert.match(root().textContent ?? "", /\[ \] Todo/);
+  });
+
+  it("toggles task-list checkboxes live via setConfig", async () => {
+    renderer = createPreviewRenderer(container, {
+      ...CONFIG,
+      taskLists: false
+    });
+    renderer.update("- [ ] Todo");
+    await flush();
+    assert.equal(
+      root().querySelector("input.markstudio-task-list-checkbox"),
+      null
+    );
+
+    renderer.setConfig({ ...CONFIG, taskLists: true });
+    await flush();
+    assert.ok(
+      root().querySelector("input.markstudio-task-list-checkbox"),
+      "toggling task lists on should render a checkbox"
+    );
+  });
+
+  it("leaves ordinary list items untouched when task lists are enabled", async () => {
+    renderer = createPreviewRenderer(container, CONFIG);
+    renderer.update("- A plain item\n- Another item");
+    await flush();
+
+    assert.equal(
+      root().querySelector("input.markstudio-task-list-checkbox"),
+      null,
+      "a plain bullet should not get a checkbox"
+    );
+    assert.equal(
+      root().querySelector("li.markstudio-task-list-item"),
+      null,
+      "a plain list item should not be flagged as a task item"
+    );
+  });
+});
+
+describe("createPreviewRenderer — table rendering (T-3.5)", () => {
+  let container: HTMLElement;
+  let renderer: PreviewRenderer | null;
+
+  beforeEach(() => {
+    container = createContainer();
+    renderer = null;
+  });
+
+  afterEach(() => {
+    renderer?.destroy();
+    removeContainer(container);
+  });
+
+  function root(): HTMLElement {
+    const el = container.querySelector(".markstudio-preview-content");
+    assert.ok(el, "preview root should exist");
+    return el as HTMLElement;
+  }
+
+  const TABLE = "| A | B |\n| - | - |\n| 1 | 2 |";
+
+  it("renders a GFM pipe table when tables are on", async () => {
+    renderer = createPreviewRenderer(container, CONFIG);
+    renderer.update(TABLE);
+    await flush();
+
+    const table = root().querySelector("table");
+    assert.ok(table, "a table element should be emitted when on");
+    assert.equal(table?.querySelectorAll("th").length, 2);
+    assert.equal(table?.querySelectorAll("td").length, 2);
+  });
+
+  it("renders table source as plain text when tables are disabled", async () => {
+    renderer = createPreviewRenderer(container, { ...CONFIG, tables: false });
+    renderer.update(TABLE);
+    await flush();
+
+    assert.equal(
+      root().querySelector("table"),
+      null,
+      "no table element should render when tables are off"
+    );
+    assert.match(root().textContent ?? "", /\| A \| B \|/);
+  });
+
+  it("toggles a table live via setConfig", async () => {
+    renderer = createPreviewRenderer(container, { ...CONFIG, tables: false });
+    renderer.update(TABLE);
+    await flush();
+    assert.equal(root().querySelector("table"), null);
+
+    renderer.setConfig({ ...CONFIG, tables: true });
+    await flush();
+    assert.ok(
+      root().querySelector("table"),
+      "toggling tables on should render the table"
+    );
+  });
+});
+
+describe("createPreviewRenderer — strikethrough rendering (T-3.5)", () => {
+  let container: HTMLElement;
+  let renderer: PreviewRenderer | null;
+
+  beforeEach(() => {
+    container = createContainer();
+    renderer = null;
+  });
+
+  afterEach(() => {
+    renderer?.destroy();
+    removeContainer(container);
+  });
+
+  function root(): HTMLElement {
+    const el = container.querySelector(".markstudio-preview-content");
+    assert.ok(el, "preview root should exist");
+    return el as HTMLElement;
+  }
+
+  it("renders ~~text~~ as struck-through text when strikethrough is on", async () => {
+    renderer = createPreviewRenderer(container, CONFIG);
+    renderer.update("This is ~~gone~~ now.");
+    await flush();
+
+    const struck = root().querySelector("s, del");
+    assert.ok(struck, "a strikethrough element should be emitted when on");
+    assert.equal(struck?.textContent, "gone");
+  });
+
+  it("leaves ~~ markers as literal text when strikethrough is disabled", async () => {
+    renderer = createPreviewRenderer(container, {
+      ...CONFIG,
+      strikethrough: false
+    });
+    renderer.update("This is ~~gone~~ now.");
+    await flush();
+
+    assert.equal(
+      root().querySelector("s, del"),
+      null,
+      "no strikethrough element should render when off"
+    );
+    assert.match(root().textContent ?? "", /~~gone~~/);
+  });
+
+  it("toggles strikethrough live via setConfig", async () => {
+    renderer = createPreviewRenderer(container, {
+      ...CONFIG,
+      strikethrough: false
+    });
+    renderer.update("~~gone~~");
+    await flush();
+    assert.equal(root().querySelector("s, del"), null);
+
+    renderer.setConfig({ ...CONFIG, strikethrough: true });
+    await flush();
+    assert.ok(
+      root().querySelector("s, del"),
+      "toggling strikethrough on should render struck-through text"
+    );
   });
 });

@@ -20,7 +20,11 @@ const VALID_CONFIG = {
   math: true,
   mermaid: true,
   callouts: true,
-  wikiLinks: true
+  wikiLinks: true,
+  footnotes: true,
+  taskLists: true,
+  tables: true,
+  strikethrough: true
 };
 
 describe("isHostToWebviewMessage", () => {
