@@ -1,4 +1,4 @@
-# AGENT HANDOFF — T-4.1 Backlinks panel (2026-06-27)
+# AGENT HANDOFF — T-4.1 Backlinks panel merged; Sprint 3 (T-4.1b) planned (2026-06-27)
 
 > Overwrite this file at the end of every working session; do not append. The previous handoff is preserved in git history. Template: [.ai/TEMPLATES/HANDOFF.md](../.ai/TEMPLATES/HANDOFF.md).
 >
@@ -9,10 +9,11 @@
 ## Session Metadata
 
 * **Date:** 2026-06-27
-* **Agent / Author:** T-4.1 session (Dev team — led by Sage, Backend)
-* **Working branch:** `feature/sprint-2` (off `main` at `d79a58f`; **not yet merged** — awaits QA sign-off + Producer merge)
-* **Last commit on `main`:** `d79a58f`
-* **Prompt used:** ai-team-dev mode (Sprint 2 spec: [sprint-2/plan.md](sprint-2/plan.md))
+* **Agent / Author:** Producer (Remy) — post-merge sync + Sprint 3 planning
+* **Working branch:** `main` (no code changed this session — docs/planning only)
+* **Last commit on `main`:** `31fe689` *(Sprint 2 closed; T-4.1 merged via `--no-ff` merge `79369f2`)*
+* **Branches:** `feature/sprint-1` and `feature/sprint-2` are fully merged and have been pruned (local + remote).
+* **Prompt used:** ai-team-producer mode
 
 ---
 
@@ -36,9 +37,9 @@ Entirely host-side, mirroring the Outline (ADR-0014) — **no webview/protocol c
 
 ## 2. Current Work In Progress
 
-* **Item:** None. T-4.1 is complete and the full local pipeline is green: `npm run lint`, `npm run typecheck`, `npm run typecheck:test`, `npm run build`, `npm test` (129 unit + 39 integration); `npm run test:exthost` (4) also passes.
-* **Note on verification:** The outstanding item is the **manual EDH (F5) matrix** in a multi-file workspace (see §9) — backlinks appearing/updating on create/change/delete, click-to-open at the line, and large-workspace responsiveness cannot be asserted under jsdom.
-* **Note on git:** All T-4.1 work is on `feature/sprint-2`. It is committed on the branch (see §8) but **not merged to `main`** — merge is the Producer's job after QA sign-off.
+* **Item:** None. T-4.1 is complete, **merged to `main`** (merge `79369f2`, Sprint 2 closed `31fe689`), and the full local pipeline is green: `npm run lint`, `npm run typecheck`, `npm run typecheck:test`, `npm run build`, `npm test` (132 unit + 39 integration); `npm run test:exthost` (4) also passes.
+* **Next sprint (planned, not started):** **Sprint 3 → T-4.1b — In-preview wiki-link navigation** ([sprint-3/plan.md](sprint-3/plan.md)).
+* **Note on git:** `feature/sprint-2` was merged with `--no-ff` (preserving the T-4.1 commits) and pruned along with `feature/sprint-1`.
 
 ---
 
@@ -119,8 +120,8 @@ None of these reverse the architecture; they are scoped placeholders with named 
 
 ## 8. Blockers
 
-* **None for development.** The full local pipeline is green.
-* **Awaiting QA + Producer:** T-4.1 is on `feature/sprint-2` and must be **QA-signed-off** (`docs/qa/sprint-2-signoff.md`) and **merged by the Producer** (regular merge, never squash/rebase). The dev team does **not** merge.
+* **None.** The full local pipeline is green and T-4.1 is merged to `main`.
+* **No outstanding merge gate:** Sprint 2 is closed. The manual EDH (F5) spot-check from the QA sign-off was completed by the maintainer at merge (backlinks list/snippet, click-to-open at line, live create/change/delete updates, case-insensitive + path-qualified resolution all confirmed — see [sprint-2/done.md](sprint-2/done.md)).
 
 ---
 
@@ -130,29 +131,28 @@ None of these reverse the architecture; they are scoped placeholders with named 
 * [x] `npm run typecheck` (strict, `src`) passes
 * [x] `npm run typecheck:test` (strict, `src` + `test`) passes
 * [x] `npm run build` passes — host bundle **~25.4 KB → ~40.4 KB** (+~15.0 KB for `src/links/`); webview unchanged (Mermaid stays in its own lazy bundle)
-* [x] `npm test` passes — **168 tests** (129 unit + 39 integration, `node:test`)
+* [x] `npm test` passes — **171 tests** (132 unit + 39 integration, `node:test`)
 * [x] `npm run test:exthost` passes — 4 Extension Host lifecycle tests
-* [ ] **Manual verification in an Extension Development Host (F5)** — **not yet done.** In a **multi-file workspace** verify: (1) open note **B** that note **A** links via `[[B]]` → the `MarkStudio Backlinks` view lists **A** with the linking line + snippet; (2) **clicking** the backlink opens **A** in a text editor with the cursor on the linking line; (3) **editing** A to add/remove a `[[B]]`, **creating** a new note linking B, and **deleting** A each update the panel (debounced) **without a manual refresh**; (4) **case-insensitive basename** (`[[b]]` matches `B.md`) and **path-qualified** (`[[sub/B]]`) targets resolve; (5) on a **large workspace** (hundreds/thousands of `.md` files) activation and typing stay responsive while the panel shows "Indexing…" then fills in.
-* [ ] Manual verification done in dark theme — pending the F5 run above
-* [ ] Manual verification done in light theme — pending the F5 run above
-* [ ] Manual verification done in high-contrast theme — pending the F5 run above
+* [x] **Manual verification in an Extension Development Host (F5)** — **done at merge** by the maintainer on a multi-file workspace: (1) `[[B]]` from A surfaces A with the linking line + snippet; (2) clicking opens A at the line; (3) create/change/delete each update the panel debounced without a manual refresh; (4) case-insensitive basename + path-qualified targets resolve; (5) large-workspace activation/typing stay responsive while the panel shows "Indexing…" then fills in.
 * [x] Webview is not recreated on tab switch (unchanged this session; entirely host-side)
 * [x] CodeMirror state preserved on tab switch (unchanged this session)
 * [x] No protocol change; no new host ⇄ webview message
-* [ ] **CI run on GitHub — pending** (branch pushed; CI runs on push/PR)
+* [x] **CI run on GitHub — done** (ran green on the `feature/sprint-2` push/PR before merge)
 
 ---
 
 ## 10. Recommended Next Task
 
-* **Task:** After T-4.1 is merged, continue **Phase 4** with **M4.2 — Hover preview for links** (hover a `[[note]]` to preview the linked note), or pick up a T-4.1 follow-up (T-4.1b in-preview wiki-link navigation is the most user-visible, and reuses this resolver directly).
-* **Why this one:** M4.1 is done; M4.2 is the next milestone per [ROADMAP.md](ROADMAP.md). The resolver shipped here is the shared primitive M4.2/M4.4 build on.
+* **Task:** Execute **Sprint 3 → T-4.1b — In-preview wiki-link navigation** ([sprint-3/plan.md](sprint-3/plan.md)): make a `[[target]]` clicked **inside the preview** resolve via the host-side `src/links/` resolver (shipped in M4.1) and open the note at the linking/heading line. Then continue Phase 4 with **M4.2 — Hover preview for links**.
+* **Why this one:** It is the most user-visible Phase 4 gap surfaced during the M4.1 F5 pass — clicking a `[[…]]` in the preview currently does nothing (T-3.4 anchors carry `data-wikilink-target` but no `href`). It reuses the merged resolver directly and is low-risk. M4.2 (the next *roadmap* milestone) is also resolver-backed, so T-4.1b is the natural stepping stone.
 * **Suggested prompt:** [.ai/PROMPTS/feature.md](../.ai/PROMPTS/feature.md).
 * **Starting files to read:**
   * [PROJECT_STATUS.md](PROJECT_STATUS.md) — current snapshot
-  * [design/backlinks.md](design/backlinks.md) + `src/links/` — the resolver + index to reuse
-  * `src/webview/preview/wikiLinks.ts` — the anchors + `data-*` an in-preview navigation feature would consume
-* **Definition of done for M4.2:** hovering a `[[note]]` shows a native hover with the linked note's content/excerpt; resolution reuses `src/links/linkIndex.ts`; tests added; pipeline + CI green.
+  * [sprint-3/plan.md](sprint-3/plan.md) — the Sprint 3 spec (scope, architecture, owners, DoD)
+  * [design/backlinks.md](design/backlinks.md) + `src/links/` — the resolver + index to reuse (needs a new `resolveTarget(fromUri, target)` surface on `LinkIndexService`)
+  * `src/webview/preview/wikiLinks.ts` — the anchors + `data-*` the click handler consumes
+  * `src/messaging/messages.ts` — where the new typed `openWikiLink` (webview → host) message + boundary guard land
+* **Definition of done for T-4.1b:** clicking a `[[target]]` in the preview opens the resolved note at the linking/heading line; resolution reuses `src/links/`; the new message is typed + boundary-validated; ambiguous/unresolved targets degrade gracefully; tests added; pipeline + CI green.
 
 ---
 
@@ -161,4 +161,4 @@ None of these reverse the architecture; they are scoped placeholders with named 
 * **Should backlinks index Markdown links (`[text](note.md)`) too, or stay wiki-link-only?** Producer scoped v1 to wiki-links (T-4.1a tracks the follow-up).
 * **Should the relative-path key be hardened for multi-root workspaces** (e.g. fold in the workspace folder), or is single-root the assumed deployment?
 * **Should the panel show a count / group by source file** when one note links the active note from several lines, or keep the current flat one-node-per-line list?
-* **Base for the PR:** `feature/sprint-2` is off `main` `d79a58f`. The diff is purely additive (`src/links/`, two test files, the `package.json` view contribution, docs) plus the two-line `extension.ts` wiring.
+* **Next sprint base:** `feature/sprint-3` branches off `main` (`31fe689`). T-4.1b is purely additive plus a new typed `openWikiLink` message and a one-instance hoist of `LinkIndexService` to `extension.ts` (see [sprint-3/plan.md](sprint-3/plan.md) §3).

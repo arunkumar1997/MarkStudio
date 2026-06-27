@@ -4,7 +4,7 @@
 >
 > Each task has: an **ID**, a **description**, **files involved** (planned paths from [ARCHITECTURE.md](ARCHITECTURE.md)), **dependencies**, and a **complexity** estimate (S / M / L).
 
-The immediate focus is now **Phase 4 — Knowledge Management** ([ROADMAP.md](ROADMAP.md)). Phase 1 — Editing Core, Phase 2 — Editing Quality, and **Phase 3 — Modern Markdown** are complete (M3.1 math, M3.2 Mermaid, M3.3 callouts, M3.4 wiki links, M3.5 footnotes & GFM completeness). **Phase 4 is under way: M4.1 — Backlinks panel (T-4.1) is Done** (awaiting QA sign-off + Producer merge). The recommended next task is in [AGENT_HANDOFF.md](AGENT_HANDOFF.md) §10.
+The immediate focus is now **Phase 4 — Knowledge Management** ([ROADMAP.md](ROADMAP.md)). Phase 1 — Editing Core, Phase 2 — Editing Quality, and **Phase 3 — Modern Markdown** are complete (M3.1 math, M3.2 Mermaid, M3.3 callouts, M3.4 wiki links, M3.5 footnotes & GFM completeness). **Phase 4 is under way: M4.1 — Backlinks panel (T-4.1) is Done and merged to `main`** (merge `79369f2`). The active sprint is **Sprint 3 → T-4.1b — In-preview wiki-link navigation** ([sprint-3/plan.md](sprint-3/plan.md)); see also [AGENT_HANDOFF.md](AGENT_HANDOFF.md) §10.
 
 ---
 
@@ -26,9 +26,10 @@ The immediate focus is now **Phase 4 — Knowledge Management** ([ROADMAP.md](RO
 * **Dependencies:** T-4.1
 * **Complexity:** M
 
-### T-4.1b · In-preview wiki-link navigation
-* **Description:** Make `[[target]]` clickable **inside the preview** — resolve the target via the host-side resolver (T-4.1) and open the note. Needs a webview → host message carrying the clicked target + the active document URI, then `markstudio.backlinks.open`-style navigation host-side.
-* **Files involved:** `src/webview/preview/wikiLinks.ts`, `src/messaging/messages.ts`, `src/links/` (resolver reuse), `src/editor/MarkStudioEditorProvider.ts`
+### T-4.1b · In-preview wiki-link navigation — **ACTIVE (Sprint 3)**
+* **Status:** Planned & delegated; the active sprint. Spec: [sprint-3/plan.md](../sprint-3/plan.md) · tracker: [sprint-3/progress.md](../sprint-3/progress.md).
+* **Description:** Make `[[target]]` clickable **inside the preview** — a delegated click handler posts a new typed `openWikiLink` (webview → host) message carrying the clicked `target` + `heading`; the host resolves via the M4.1 resolver (relative to the active note) and opens the note at the `#heading` line (else line 0), reusing the `markstudio.backlinks.open`-style open-at-line helper. Shares a single hoisted `LinkIndexService`.
+* **Files involved:** `src/webview/preview/wikiLinks.ts`, `src/messaging/messages.ts`, `src/links/linkIndex.ts` + `src/links/LinkIndexService.ts` (add `resolveTarget`), `src/links/registerBacklinks.ts` + `src/extension.ts` (share the index), `src/editor/MarkStudioEditorProvider.ts`, `src/outline/headings.ts` (heading line)
 * **Dependencies:** T-4.1, T-3.4
 * **Complexity:** M
 

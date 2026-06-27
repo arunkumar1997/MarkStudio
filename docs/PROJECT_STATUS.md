@@ -7,19 +7,19 @@
 ## 1. Snapshot
 
 * **Current phase:** **Phase 4 — Knowledge Management is UNDER WAY.** Phase 0, Phase 1 — Editing Core, Phase 2 — Editing Quality, and Phase 3 — Modern Markdown are all complete.
-* **Current milestone:** **T-4.1 — Backlinks panel (M4.1) Done.** A native **`MarkStudio Backlinks`** tree view (Explorer container, visible only while a MarkStudio editor is active) lists every *other* workspace note that links to the active note via a wiki-link (`[[note]]`), one node per source note + linking line; clicking opens the source at the linking line. This is the first Phase 4 feature and also lands the **wiki-link resolver** deferred from Phase 3 (T-3.4 / ADR-0018). Implemented host-side, mirroring the Outline (ADR-0014): a new `src/links/` module with two **pure** units (`parseWikiTargets`, `linkIndex`/resolver) and a `LinkIndexService` that scans the workspace **asynchronously** (never blocking activation) and stays live via a **debounced `FileSystemWatcher`** with **incremental** per-file re-parse. Resolution is **case-insensitive basename**, path-qualified **relative-first**, ambiguous → all, no self-link; `#heading` captured but file-resolved. **No new dependency, no new setting, no webview/protocol change.**
+* **Current milestone:** **T-4.1 — Backlinks panel (M4.1) Done and merged to `main`** (merge `79369f2`, Sprint 2 closed `31fe689`). A native **`MarkStudio Backlinks`** tree view (Explorer container, visible only while a MarkStudio editor is active) lists every *other* workspace note that links to the active note via a wiki-link (`[[note]]`), one node per source note + linking line; clicking opens the source at the linking line. This is the first Phase 4 feature and also lands the **wiki-link resolver** deferred from Phase 3 (T-3.4 / ADR-0018). Implemented host-side, mirroring the Outline (ADR-0014): a new `src/links/` module with two **pure** units (`parseWikiTargets`, `linkIndex`/resolver) and a `LinkIndexService` that scans the workspace **asynchronously** (never blocking activation) and stays live via a **debounced `FileSystemWatcher`** with **incremental** per-file re-parse. Resolution is **case-insensitive basename**, path-qualified **relative-first**, ambiguous → all, no self-link; `#heading` captured but file-resolved. **No new dependency, no new setting, no webview/protocol change.**
 * **Overall completion (qualitative):** Phase 0: 100%. Phase 1: 100%. Phase 2: 100%. Phase 3: 100%. **Phase 4: M4.1 done** (M4.2 hover preview, M4.3 transclusion, M4.4 graph view remain).
-* **Last updated:** 2026-06-27 by the T-4.1 session
-* **Last commit on `main`:** `d79a58f` *(T-4.1 work lives on the `feature/sprint-2` branch, not yet merged — awaits QA sign-off + Producer merge)*
+* **Last updated:** 2026-06-27 by the Producer (Remy) — post-merge sync + Sprint 3 planning
+* **Last commit on `main`:** `31fe689` *(T-4.1 merged via `--no-ff` merge `79369f2`; Sprint 2 closed. `feature/sprint-1` and `feature/sprint-2` are fully merged and have been pruned.)*
 
 ---
 
 ## 2. Current Focus
 
-* **Active initiative:** **Phase 4 — Knowledge Management.** T-4.1 (Backlinks panel) ships as a host-side `vscode.TreeDataProvider` (`src/links/BacklinksTreeProvider.ts` + `registerBacklinks.ts`) over a workspace `LinkIndexService`, backed by the pure `parseWikiTargets` + `linkIndex` resolver. **No new dependency, no new setting, no new message type, no webview structural change.**
-* **Owner (current agent):** T-4.1 session (Sage)
-* **Started:** 2026-06-27
-* **Target outcome:** M4.1 is met. The next milestone is **M4.2 — Hover preview for links** ([ROADMAP.md](ROADMAP.md)) — see [TODO.md](TODO.md) and [AGENT_HANDOFF.md](AGENT_HANDOFF.md) §10.
+* **Active initiative:** **Phase 4 — Knowledge Management.** M4.1 (Backlinks panel, T-4.1) is shipped and merged. The next sprint is **Sprint 3 → T-4.1b — In-preview wiki-link navigation** (make `[[note]]` clickable inside the preview by reusing the M4.1 resolver), followed by the **M4.2 — Hover preview for links** milestone. See [sprint-3/plan.md](sprint-3/plan.md).
+* **Owner (next sprint):** Sage (host resolver + messaging) + Nova (webview click handler); QA: Ivy
+* **Started:** Sprint 3 planned 2026-06-27 (not yet executed)
+* **Target outcome:** Clicking a `[[target]]` in the preview resolves via `src/links/` and opens the note at the heading line; then M4.2 hover preview. See [TODO.md](TODO.md) and [AGENT_HANDOFF.md](AGENT_HANDOFF.md) §10.
 
 ---
 
@@ -50,7 +50,7 @@ User-visible features that are shipped and stable.
 | **Callouts / admonitions (Phase 3 M3.3)** — GitHub-style callout blockquotes (`> [!NOTE]`, `> [!TIP]`, `> [!IMPORTANT]`, `> [!WARNING]`, `> [!CAUTION]`) rendered as themed boxes with a Codicon icon + title in the preview via a dependency-free markdown-it core rule; toggleable through `markstudio.preview.callouts` (default on) and degrading to an ordinary blockquote when off; themed entirely via `--vscode-*` variables (ADR-0017) | 3 | Unreleased (T-3.3) |
 | **Wiki-style links (Phase 3 M3.4)** — `[[note]]`, `[[note|alias]]`, and `[[note#heading]]` rendered as styled links in the preview via a dependency-free markdown-it inline rule; toggleable through `markstudio.preview.wikiLinks` (default on) and degrading to literal text when off; themed via `--vscode-*` variables; resolution to real files deferred to Phase 4 (ADR-0018) | 3 | Unreleased (T-3.4) |
 | **Footnotes & GFM completeness (Phase 3 M3.5)** — footnotes (`[^1]` refs + `[^1]:` defs), GFM task lists (`- [ ]` / `- [x]`, rendered as **disabled** read-only checkboxes), GFM tables, and strikethrough (`~~text~~`) rendered in the preview, **each individually toggleable** through its own `markstudio.preview.*` setting (all default on) and degrading gracefully when off; footnotes via `markdown-it-footnote`, task lists via a dependency-free core rule, tables + strikethrough via markdown-it's built-ins; themed via `--vscode-*` variables (ADR-0019). **Closes Phase 3.** | 3 | Unreleased (T-3.5) |
-| **Backlinks panel (Phase 4 M4.1)** — native `MarkStudio Backlinks` tree view (Explorer container) listing every other workspace note that links to the active note via a wiki-link (`[[note]]`), one node per source note + linking line; clicking opens the source at the linking line. Backed by a host-side workspace link index (async, non-blocking scan + debounced `FileSystemWatcher` + incremental rebuild) and the wiki-link resolver deferred from Phase 3 (case-insensitive basename, path-qualified relative-first). No new dependency, no new setting, no webview/protocol change (ADR-0020) | 4 | Unreleased (T-4.1) |
+| **Backlinks panel (Phase 4 M4.1)** — native `MarkStudio Backlinks` tree view (Explorer container) listing every other workspace note that links to the active note via a wiki-link (`[[note]]`), one node per source note + linking line; clicking opens the source at the linking line. Backed by a host-side workspace link index (async, non-blocking scan + debounced `FileSystemWatcher` + incremental rebuild) and the wiki-link resolver deferred from Phase 3 (case-insensitive basename, path-qualified relative-first). No new dependency, no new setting, no webview/protocol change (ADR-0020) | 4 | Unreleased (T-4.1, merged `79369f2`) |
 
 For details, see [FEATURES.md](FEATURES.md).
 
@@ -60,7 +60,7 @@ For details, see [FEATURES.md](FEATURES.md).
 
 | Item | State | Owner | Notes |
 | ---- | ----- | ----- | ----- |
-| *(none — T-4.1 closed; M4.1 done)* | — | — | The next milestone is M4.2 — Hover preview for links |
+| *(none — T-4.1 merged; M4.1 done)* | — | — | Next sprint is Sprint 3 — T-4.1b (in-preview wiki-link navigation); then M4.2 — Hover preview for links |
 
 ---
 
@@ -133,9 +133,9 @@ For details, see [FEATURES.md](FEATURES.md).
 
 ## 10. Recommended Next Task
 
-* **Task:** Begin **Phase 4 — Knowledge Management** ([ROADMAP.md](ROADMAP.md)) — the first milestone is **M4.1 — Backlinks panel**. A natural first step is to wire the Phase 4 wiki-link **resolver** (T-3.4 already emits `data-wikilink-target` / `data-wikilink-heading` on each anchor with no `href`) so `[[note]]` links resolve to real files and navigate.
-* **Why:** Phase 3 — Modern Markdown is complete (M3.1–M3.5 all done); Phase 4 is next per the roadmap.
-* **Before starting:** T-3.5 lives on `feature/sprint-1` and must be QA-signed-off and merged by the Producer first (see [AGENT_HANDOFF.md](AGENT_HANDOFF.md) §8–9).
+* **Task:** Execute **Sprint 3 → T-4.1b — In-preview wiki-link navigation** ([sprint-3/plan.md](sprint-3/plan.md)): make a `[[target]]` clicked **inside the preview** resolve via the host-side `src/links/` resolver (shipped in M4.1) and open the note at the linking/heading line. This introduces the first webview ⇄ host protocol addition since the Outline — a typed `openWikiLink` (webview → host) message with boundary validation.
+* **Why:** It is the most user-visible Phase 4 gap (clicking a preview link currently does nothing — the T-3.4 anchors carry `data-wikilink-target` but no `href`), it directly reuses the resolver already merged, and it is low-risk. The next *roadmap* milestone after it is **M4.2 — Hover preview for links** (also resolver-backed).
+* **Before starting:** Nothing blocks it — `main` is green at `31fe689` with M4.1 merged.
 * **Suggested prompt:** [.ai/PROMPTS/feature.md](../.ai/PROMPTS/feature.md).
 
 ---
