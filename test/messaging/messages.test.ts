@@ -14,7 +14,13 @@ import {
   isWebviewToHostMessage
 } from "../../src/messaging/messages";
 
-const VALID_CONFIG = { lineNumbers: true, wordWrap: true };
+const VALID_CONFIG = {
+  lineNumbers: true,
+  wordWrap: true,
+  math: true,
+  mermaid: true,
+  callouts: true
+};
 
 describe("isHostToWebviewMessage", () => {
   it("rejects non-objects", () => {
@@ -102,6 +108,27 @@ describe("isHostToWebviewMessage", () => {
         false
       );
       assert.equal(isHostToWebviewMessage({ type: "configChanged" }), false);
+    });
+  });
+
+  describe("revealLine", () => {
+    it("accepts a numeric line", () => {
+      assert.equal(
+        isHostToWebviewMessage({ type: "revealLine", line: 12 }),
+        true
+      );
+      assert.equal(
+        isHostToWebviewMessage({ type: "revealLine", line: 0 }),
+        true
+      );
+    });
+
+    it("rejects a missing or non-numeric line", () => {
+      assert.equal(isHostToWebviewMessage({ type: "revealLine" }), false);
+      assert.equal(
+        isHostToWebviewMessage({ type: "revealLine", line: "3" }),
+        false
+      );
     });
   });
 

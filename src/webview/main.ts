@@ -57,7 +57,7 @@ function mount(): void {
                 bus.post({ type: "layoutModeChanged", mode });
               }
             });
-            preview = createPreviewRenderer(shell.previewPane);
+            preview = createPreviewRenderer(shell.previewPane, message.config);
             editor = createEditor({
               parent: shell.editorPane,
               initialText: message.text,
@@ -89,6 +89,7 @@ function mount(): void {
           } else {
             editor?.setContentFromHost(message.text);
             editor?.setConfig(message.config);
+            preview?.setConfig(message.config);
           }
           preview?.update(message.text);
           return;
@@ -114,6 +115,16 @@ function mount(): void {
           return;
         case "configChanged":
           editor?.setConfig(message.config);
+          preview?.setConfig(message.config);
+          return;
+        case "revealLine":
+          // Navigation from the document-outline tree (T-2.2). Make sure the
+          // editor pane is visible before revealing — in preview-only mode it
+          // is hidden, so promote to split first.
+          if (shell?.getLayoutMode() === "preview-only") {
+            shell.setLayoutMode("split");
+          }
+          editor?.revealLine(message.line);
           return;
         case "error":
           console.error(`[markstudio] host error: ${message.message}`);
@@ -263,6 +274,70 @@ function injectBaseStyles(): void {
     .markstudio-preview-content img {
       max-width: 100%;
       height: auto;
+    }
+    /* Mermaid diagram containers (T-3.2). Centered; the rendered SVG scales to
+       the pane width. Until the diagram renders, the raw source shows as a
+       monospace placeholder so nothing is lost if the library is unavailable. */
+    .markstudio-mermaid {
+      margin: 0.8em 0;
+      text-align: center;
+      font-family: var(--vscode-editor-font-family);
+      white-space: pre-wrap;
+    }
+    .markstudio-mermaid svg {
+      max-width: 100%;
+      height: auto;
+    }
+    .markstudio-mermaid-error {
+      text-align: left;
+      white-space: pre-wrap;
+      color: var(--vscode-errorForeground);
+    }
+    /* Callout / admonition boxes (T-3.3). Themed entirely through --vscode-*
+       variables: the accent (border + icon + title) is driven by a per-type
+       text color, with a faint tinted body via the editor widget background.
+       Falls back to ordinary blockquote styling tokens when a type-specific
+       variable is unavailable. */
+    .markstudio-callout {
+      margin: 0.8em 0;
+      padding: 0.6em 1em;
+      border-left: 4px solid var(--markstudio-callout-accent);
+      border-radius: 4px;
+      background-color: var(--vscode-textBlockQuote-background, var(--vscode-editorWidget-background, transparent));
+      --markstudio-callout-accent: var(--vscode-textLink-foreground);
+    }
+    .markstudio-callout > *:first-child {
+      margin-top: 0;
+    }
+    .markstudio-callout > *:last-child {
+      margin-bottom: 0;
+    }
+    .markstudio-callout-title {
+      display: flex;
+      align-items: center;
+      gap: 0.5em;
+      font-weight: 600;
+      margin-bottom: 0.4em;
+      color: var(--markstudio-callout-accent);
+    }
+    .markstudio-callout-title .codicon {
+      font-size: 1.1em;
+      flex: 0 0 auto;
+    }
+    .markstudio-callout-note {
+      --markstudio-callout-accent: var(--vscode-charts-blue, var(--vscode-textLink-foreground));
+    }
+    .markstudio-callout-tip {
+      --markstudio-callout-accent: var(--vscode-charts-green, var(--vscode-terminal-ansiGreen, var(--vscode-textLink-foreground)));
+    }
+    .markstudio-callout-important {
+      --markstudio-callout-accent: var(--vscode-charts-purple, var(--vscode-textLink-foreground));
+    }
+    .markstudio-callout-warning {
+      --markstudio-callout-accent: var(--vscode-editorWarning-foreground, var(--vscode-charts-yellow, var(--vscode-textLink-foreground)));
+    }
+    .markstudio-callout-caution {
+      --markstudio-callout-accent: var(--vscode-editorError-foreground, var(--vscode-charts-red, var(--vscode-errorForeground)));
     }
   `;
   document.head.append(style);

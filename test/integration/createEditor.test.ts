@@ -17,7 +17,13 @@ import {
 import type { MarkStudioConfig } from "../../src/messaging/messages";
 import { createContainer, removeContainer } from "./_setup/dom";
 
-const CONFIG: MarkStudioConfig = { lineNumbers: true, wordWrap: true };
+const CONFIG: MarkStudioConfig = {
+  lineNumbers: true,
+  wordWrap: true,
+  math: true,
+  mermaid: true,
+  callouts: true
+};
 
 describe("createEditor — host/local edit seam", () => {
   let container: HTMLElement;

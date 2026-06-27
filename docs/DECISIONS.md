@@ -21,6 +21,9 @@ The foundational ADRs below (0001–0006) encode the non-negotiable rules from [
 | [0011](#adr-0011-unit-test-harness-on-nodes-built-in-runner-with-an-esbuild-bundled-vscode-mock) | Unit-test harness on Node's built-in runner with an esbuild-bundled `vscode` mock | Accepted |
 | [0012](#adr-0012-integration-test-harness-jsdom-on-nodetest-for-the-webview-dom-seams) | Integration-test harness: jsdom on `node:test` for the webview DOM seams | Accepted |
 | [0013](#adr-0013-extension-host-lifecycle-tests-on-vscodetest-electron-with-a-minimal-in-host-runner) | Extension Host lifecycle tests on `@vscode/test-electron` with a minimal in-host runner | Accepted |
+| [0014](#adr-0014-document-outline-as-a-host-side-treedataprovider) | Document outline as a host-side `TreeDataProvider` | Accepted |
+| [0015](#adr-0015-katex-for-math-rendering-in-the-preview) | KaTeX for math rendering in the preview | Accepted |
+| [0016](#adr-0016-lazy-loaded-mermaid-for-diagram-rendering-in-the-preview) | Lazy-loaded Mermaid for diagram rendering in the preview | Accepted |
 
 ---
 
@@ -648,3 +651,173 @@ Not a migration. New files: `esbuild.exthost.js`, `test/exthost/runTests.ts`, `t
 * [TODO.md](TODO.md) — T-113b, T-120
 * `@vscode/test-electron` documentation
 
+---
+
+## ADR-0014: Document outline as a host-side `TreeDataProvider`
+
+### Status
+`Accepted`
+
+### Date
+2026-06-27
+
+### Context
+Phase 2 milestone M2.2 (T-2.2) calls for a navigable heading outline that updates as headings change. VS Code already ships an **Outline** view and breadcrumbs, but both are driven by `vscode.window.activeTextEditor`, which is `undefined` while a custom editor is focused. MarkStudio's document is a real `TextDocument`, yet a plain `DocumentSymbolProvider` never surfaces for it because the Outline view has no "active text editor" to attach to. The outline therefore needs a surface MarkStudio owns. [TODO.md](TODO.md) framed the open choice as: a host-side `TreeDataProvider` in a view container, or an in-webview outline pane.
+
+### Decision
+1. **Provide the outline as a host-side `vscode.TreeDataProvider`** backed by a dedicated tree view (`markstudio.outline`, contributed to the Explorer container, visible only when `activeCustomEditorId == 'markstudio.editor'`). It follows the active MarkStudio editor through `MarkStudioEditorProvider.onDidChangeActiveDocument` (the same event the word-count indicator uses, T-2.4) and rebuilds on edits via a debounced `onDidChangeTextDocument`.
+2. **Parse headings host-side** with a pure, dependency-free scanner (`src/outline/headings.ts`: `parseHeadings` + `buildHeadingTree`) over the `TextDocument` the provider already owns — not via the webview's markdown-it tokeniser. The scanner handles ATX and setext headings and skips fenced code blocks and leading YAML front matter.
+3. **Navigate via one host → webview message.** Clicking a heading runs the internal `markstudio.outline.reveal` command, which calls `MarkStudioEditorController.revealLine(line)` → posts `revealLine { line }`. The webview promotes `preview-only` to `split` if needed, then `createEditor.revealLine` clamps the 0-based line to the document, places the cursor at its start (`EditorSelection.cursor`), and scrolls it into view (`EditorView.scrollIntoView`).
+
+### Alternatives Considered
+1. **A `DocumentSymbolProvider`** — Rejected: does not surface for custom editors (the core problem); it would require a focused text editor that does not exist for MarkStudio.
+2. **An in-webview outline pane** — Rejected: duplicates UI VS Code already provides natively, adds a third pane and its layout/state to the App Shell, and conflicts with "less UI is better" and "native beats custom" ([.ai/CONTEXT.md](../.ai/CONTEXT.md)). A native tree view gives free theming, keyboard navigation, and collapse/expand.
+3. **Deriving headings from the webview's markdown-it tokeniser (T-105)** — Rejected: the tokeniser lives in the webview, so it would require a round-trip and couple the outline to the preview. A small host-side scanner is decoupled, needs no message to build, and is trivially unit-testable.
+
+### Reasoning
+A native `TreeView` reads as a first-party VS Code surface and inherits its theming, accessibility, and navigation for free — directly serving "feel native" ([ARCHITECTURE.md](ARCHITECTURE.md) §1) and "prefer VS Code integration; less UI is better." Parsing host-side keeps the pure logic isolated and well-tested (16 unit tests) and avoids a webview dependency. Navigation reuses the established controller + typed-message seam (T-106/T-108), so no new architectural surface is introduced beyond one message.
+
+### Consequences
+**Positive:** A navigable outline that follows the active MarkStudio editor and updates as headings change, with native chrome and no custom webview UI. The heading scanner is pure and fully unit-tested. Navigation reuses the existing message bus.
+**Negative / Trade-offs:** The outline shows the raw source text of a heading (inline Markdown such as `**bold**` is not stripped). The view follows only the **active** MarkStudio editor (consistent with the rest of the extension). The host-side scanner is a second, smaller Markdown parser alongside markdown-it — intentional, to keep the outline decoupled.
+**Neutral:** A new `src/outline/` module (`headings.ts`, `OutlineTreeProvider.ts`, `registerOutline.ts`), one new view contribution, one internal command, and one new host → webview message. Host bundle grows to ~11.8 KB (production-minified); the webview gains only the `revealLine` handler (~701.8 KB, ≈ unchanged).
+
+### Compliance Impact
+No rule bent. Upholds ADR-0001 (the outline reads the managed `TextDocument`), ADR-0002 (navigation is a `postMessage`, the webview is never rebuilt), ADR-0004 (native theming via the tree view), and ADR-0005 (no framework — vanilla host code and a pure scanner).
+
+### References
+* [ADR-0001](#adr-0001-use-the-custom-editor-api)
+* [ADR-0010](#adr-0010-reactive-configuration-service-with-cm6-compartments-for-live-settings)
+* [design/outline.md](design/outline.md)
+* [api/message-protocol.md](api/message-protocol.md)
+* [ROADMAP.md](ROADMAP.md) — Phase 2 M2.2
+* [TODO.md](TODO.md) — T-2.2
+
+
+---
+
+## ADR-0015: KaTeX for math rendering in the preview
+
+### Status
+`Accepted`
+
+### Date
+2026-06-27
+
+### Context
+Phase 3 milestone M3.1 (T-3.1) calls for inline (`$�$`) and block (`$$�$$`) math rendering in the preview. It must attach to the existing markdown-it pipeline, be **individually toggleable** via configuration, and **degrade gracefully** when disabled (the delimiters must never break rendering). [AGENT_HANDOFF.md](AGENT_HANDOFF.md) �11 framed the open choice as KaTeX vs. MathJax vs. a lighter option, to be weighed on bundle size, licensing, and fidelity.
+
+### Decision
+1. **Render math with KaTeX** via the `@vscode/markdown-it-katex` plugin � the same plugin VS Code's built-in Markdown math uses. KaTeX (`katex`) renders TeX to HTML + CSS synchronously. Both are MIT-licensed.
+2. **Gate the plugin behind a new setting** `markstudio.preview.math` (boolean, default `true`, `resource` scope), threaded through the existing `MarkStudioConfig` + `configChanged` seam (T-111). `PreviewRenderer` gains a `setConfig(config)` that **rebuilds** the markdown-it instance (with or without the plugin) when the `math` flag flips and re-renders the last text � markdown-it plugins cannot be cleanly detached, so a rebuild on the rare settings event is the clean path; the hot typing path keeps a single instance (ADR-0008).
+3. **Ship KaTeX assets locally.** `esbuild.js` copies `katex.min.css` and its `fonts/` directory into `dist/katex/`; `webviewHtml.ts` loads the stylesheet via `asWebviewUri`. The fonts resolve next to the CSS and are served under the existing `font-src ${webview.cspSource}` CSP rule (same pattern as Codicons, ADR/T-107).
+
+### Alternatives Considered
+1. **MathJax** � Rejected: heavier and asynchronous, with a larger bundle; the marginal fidelity gain does not justify the size and async complexity in a preview pane.
+2. **A hand-rolled TeX parser** � Rejected outright: re-implementing TeX layout is out of scope and would never match KaTeX.
+3. **Lazy-loading KaTeX only when `math` is on** � Deferred: dynamic script injection complicates the CSP/nonce model. The toggle controls *rendering*, not bundling; the library is always bundled.
+
+### Reasoning
+KaTeX is fast, synchronous (fits the existing block-diff render loop), small relative to MathJax, and the VS Code plugin gives robust `$`/`$$` delimiter parsing for free. Configuring the plugin with `throwOnError: false` means a malformed expression renders in KaTeX's error color instead of throwing, so a typo can never break the whole preview. Reusing the `MarkStudioConfig` + `configChanged` seam means the toggle needs no new message type.
+
+### Consequences
+**Positive:** Native-looking inline and block math, individually toggleable, that degrades to literal text when off. No new message type. Fonts are local (no remote fetch).
+**Negative / Trade-offs:** KaTeX is always bundled even when math is disabled � the production-minified webview grows from ~701.8 KB to **~971.9 KB** (+~270 KB). The `fonts/` directory (60 font files) ships in `dist/katex/`. Toggling the setting rebuilds the markdown-it instance and forces one full re-render (acceptable: a settings event, not a keystroke).
+**Neutral:** Two new runtime dependencies (`katex`, `@vscode/markdown-it-katex`) and one dev dependency (`@types/katex`); a new `markstudio.preview.math` setting; the `math` field on `MarkStudioConfig`.
+
+### Compliance Impact
+No rule bent. Upholds ADR-0002 (the preview is patched, never rebuilt, on the hot path; the webview is never reloaded), ADR-0003/0008 (markdown-it plugin seam for preview rendering), ADR-0004 (KaTeX CSS theming + local fonts under the existing CSP), and ADR-0005 (no UI framework � a markdown-it plugin, not a component library). The dependency additions are justified here per the dependency-policy spirit of the foundational ADRs.
+
+### References
+* [ADR-0003](#adr-0003-codemirror-6-for-editing-markdown-it-for-preview)
+* [ADR-0008](#adr-0008-markdown-it-package-and-incremental-block-level-preview-patching)
+* [ADR-0010](#adr-0010-reactive-configuration-service-with-cm6-compartments-for-live-settings)
+* [design/math.md](design/math.md)
+* [ROADMAP.md](ROADMAP.md) � Phase 3 M3.1
+
+
+---
+
+## ADR-0016: Lazy-loaded Mermaid for diagram rendering in the preview
+
+### Status
+`Accepted`
+
+### Date
+2026-06-27
+
+### Context
+Phase 3 milestone M3.2 (T-3.2) calls for rendering fenced ```mermaid blocks as diagrams in the preview. Like math (ADR-0015), it must attach to the existing markdown-it pipeline, be **individually toggleable** via configuration, and **degrade gracefully** when disabled. Unlike KaTeX, Mermaid is **large** (~3.3 MB minified) and renders **asynchronously** (its `render` returns a Promise). [AGENT_HANDOFF.md](AGENT_HANDOFF.md) §10–11 flagged the open question: bundle Mermaid unconditionally (as KaTeX is) or lazy-load it, and to capture the choice in an ADR.
+
+### Decision
+1. **Render diagrams with Mermaid**, lazy-loaded **on first use**. Mermaid ships as a **separate esbuild bundle** (`dist/mermaid.js`, built from `src/webview/preview/mermaidEntry.ts`) that is **not** part of the main webview bundle. The first time the preview renders a ```mermaid block, `src/webview/preview/mermaid.ts` injects a `<script>` — carrying the page nonce — that publishes the Mermaid API on a global; every later diagram reuses it.
+2. **Override the fence renderer** so a ```mermaid block emits a placeholder `<div class="markstudio-mermaid">` holding the escaped source instead of a `<pre><code>`. After the existing block-diff `patch`, an async pass (`renderMermaidBlocks`) replaces each unrendered container's contents with the rendered SVG. Because the placeholder HTML encodes the source, an edit to a diagram changes the cached block HTML and `patch` swaps in a fresh, unrendered container; an unchanged diagram keeps its node (and its already-rendered SVG), so typing elsewhere never redraws it.
+3. **Gate the feature behind a new setting** `markstudio.preview.mermaid` (boolean, default `true`, `resource` scope), threaded through the existing `MarkStudioConfig` + `configChanged` seam (T-111). `PreviewRenderer.setConfig` rebuilds the markdown-it instance when the `mermaid` (or `math`) flag flips — the same rare-settings-event path as ADR-0015. When off, the fence falls through to markdown-it's default renderer (a plain code block), so nothing breaks.
+
+### Alternatives Considered
+1. **Bundle Mermaid unconditionally** (as KaTeX is, ADR-0015) — Rejected: Mermaid is ~3.3 MB minified, more than 3× the entire current webview bundle. Always paying that download for the majority of documents that contain no diagrams is unacceptable; the off-path-feature cost should be deferred.
+2. **esbuild code splitting** (dynamic `import()` chunks) — Rejected: code splitting requires `format: "esm"`, which would convert the webview to a module and complicate the nonce/CSP load path. A separate IIFE bundle injected with the page nonce is simpler and needs no CSP change (a nonce-bearing `<script>` is allowed regardless of its `src`).
+3. **Render diagrams synchronously inside the block diff** — Not possible: Mermaid's `render` is asynchronous. The fire-and-forget post-`patch` pass keeps the hot render path synchronous.
+
+### Reasoning
+Lazy loading keeps the base webview bundle essentially unchanged (**~971.9 KB → ~974.3 KB**, +~2.4 KB for the loader) while Mermaid lives in its own **~3.3 MB** bundle fetched only when a diagram is first seen. A nonce-bearing injected `<script>` satisfies the strict `script-src 'nonce-…'` CSP without exposing the nonce or relaxing the policy; Mermaid runs with `securityLevel: "strict"` (DOMPurify, no raw HTML). A diagram parse error is shown only in that diagram's box, and a library-load failure leaves the raw source visible — so rendering never breaks.
+
+### Consequences
+**Positive:** Native-looking diagrams, individually toggleable, that degrade to a code block when off and never bloat the base download. No new message type. No CSP change.
+**Negative / Trade-offs:** Mermaid rendering is asynchronous, so a diagram appears a frame after its surrounding text (acceptable for a preview). The Mermaid theme is detected once at load from the VS Code body classes; a live theme switch does not re-theme already-rendered diagrams until the next edit (tracked as minor debt). Mermaid's actual in-webview rendering cannot be asserted under the jsdom test harness, so it stays in the manual EDH matrix — the integration tests cover the markdown-it seam (placeholder emission, code-block fallback, live toggle).
+**Neutral:** One new runtime dependency (`mermaid`); a new `markstudio.preview.mermaid` setting; the `mermaid` field on `MarkStudioConfig`; a third esbuild build target.
+
+### Compliance Impact
+No rule bent. Upholds ADR-0002 (the preview is patched, never rebuilt, on the hot path; the webview is never reloaded), ADR-0003/0008 (markdown-it seam for preview rendering), ADR-0004 (strict CSP preserved; the injected script reuses the existing nonce), and ADR-0005 (no UI framework — a markdown-it fence override plus a vanilla loader). The dependency addition is justified here per the dependency-policy spirit of the foundational ADRs.
+
+### References
+* [ADR-0008](#adr-0008-markdown-it-package-and-incremental-block-level-preview-patching)
+* [ADR-0010](#adr-0010-reactive-configuration-service-with-cm6-compartments-for-live-settings)
+* [ADR-0015](#adr-0015-katex-for-math-rendering-in-the-preview)
+* [design/mermaid.md](design/mermaid.md)
+* [ROADMAP.md](ROADMAP.md) — Phase 3 M3.2
+* [TODO.md](TODO.md) — T-3.2
+
+---
+
+## ADR-0017: Callouts as a dependency-free markdown-it core rule
+
+### Status
+`Accepted`
+
+### Date
+2026-06-27
+
+### Context
+**T-3.3** (Phase 3 M3.3) adds GitHub-style callout / admonition blocks — a blockquote whose first line is a `[!TYPE]` marker (`> [!NOTE]`, `> [!WARNING]`, `> [!TIP]`, `> [!IMPORTANT]`, `> [!CAUTION]`). They must attach to the existing markdown-it preview, be individually toggleable via `markstudio.preview.callouts`, degrade to an ordinary blockquote when off, and theme entirely via `--vscode-*` variables. Unlike math (ADR-0015) and Mermaid (ADR-0016), callouts are pure markup — no rendering engine is required.
+
+### Decision
+1. **No new dependency.** The transform is implemented inline as a small markdown-it **core rule** (`src/webview/preview/callouts.ts`, `applyCallouts(md)`), registered only when the setting is on.
+2. **Post-process the token stream.** After the built-in blockquote parser runs, the rule finds a `blockquote_open` whose first paragraph's first line matches `^\s*\[!(TYPE)\]\s*(title?)$` for a known type. It rewrites the `blockquote_open`/`blockquote_close` tags to `div`, stamps `class="markstudio-callout markstudio-callout-<type>"`, injects an `html_block` title token (Codicon icon + escaped label/custom title), and strips the marker line from the body (re-parsing the remaining inline content, or dropping the marker-only paragraph).
+3. **Toggle reuses the config seam (T-111).** `MarkStudioConfig` gains a `callouts` field (validated by `isMarkStudioConfig`); `ConfigurationService.read` resolves `preview.callouts` (default `true`); `package.json` contributes the `resource`-scoped setting. `PreviewRenderer.createMarkdownIt(math, mermaid, callouts)` applies the rule when on, and `setConfig` rebuilds the instance when `callouts` flips (alongside `math`/`mermaid`). No new message type.
+4. **Theme via `--vscode-*` only.** Each type sets one `--markstudio-callout-accent` variable from a VS Code theme variable (charts/editor colours, with fallbacks); the border, icon, and title derive from it. Icons reuse the Codicons font already loaded in the webview (T-107).
+
+### Alternatives Considered
+1. **An npm callout plugin** (e.g. `markdown-it-github-alerts`) — Rejected: a dependency for ~80 lines of well-scoped logic, against the dependency-policy ADRs.
+2. **Override only the `blockquote_open` renderer** — Rejected: the renderer cannot see/strip the inline marker or inject the title node cleanly.
+3. **A block-level rule replacing the blockquote parser** — Rejected: far more invasive than post-processing the already-parsed tokens, and risks regressing ordinary blockquotes.
+
+### Reasoning
+"Native beats custom" and the lean dependency list (ADR-0005) point straight at an inline rule. Post-processing the token stream mirrors the fence-override pattern T-3.2 already established, keeps ordinary blockquotes untouched, and is fully exercisable through the existing jsdom integration harness. The `html_block` title injection emits trusted, escaped markup without enabling raw HTML (`html: false`) anywhere else.
+
+### Consequences
+**Positive:** Native-looking callouts, individually toggleable, that degrade to a blockquote when off — with **no new dependency** and **no bundle bloat** (production-minified webview **~974.3 KB → ~977.7 KB**, +~3.4 KB for the rule + CSS). No new message type, no CSP change.
+**Negative / Trade-offs:** The marker syntax/type list is hard-coded in the rule (extending it is a code change). The visual theming cannot be asserted under jsdom, so it stays in the manual EDH matrix — the integration tests cover the markdown-it seam (styled markup when on, plain-blockquote fallback when off, ordinary blockquote untouched, live toggle).
+**Neutral:** A new `markstudio.preview.callouts` setting; the `callouts` field on `MarkStudioConfig`; a new `src/webview/preview/callouts.ts` module.
+
+### Compliance Impact
+No rule bent. Upholds ADR-0002 (preview patched, never rebuilt, on the hot path), ADR-0003/0008 (markdown-it seam for preview rendering), ADR-0004 (strict CSP, `--vscode-*` theming), and ADR-0005 (no UI framework, no new dependency).
+
+### References
+* [ADR-0008](#adr-0008-markdown-it-package-and-incremental-block-level-preview-patching)
+* [ADR-0010](#adr-0010-reactive-configuration-service-with-cm6-compartments-for-live-settings)
+* [ADR-0015](#adr-0015-katex-for-math-rendering-in-the-preview)
+* [ADR-0016](#adr-0016-lazy-loaded-mermaid-for-diagram-rendering-in-the-preview)
+* [design/callouts.md](design/callouts.md)
+* [ROADMAP.md](ROADMAP.md) — Phase 3 M3.3
+* [TODO.md](TODO.md) — T-3.3

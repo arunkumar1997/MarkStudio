@@ -23,13 +23,25 @@ describe("ConfigurationService.read", () => {
 
   it("defaults lineNumbers to true when unset", () => {
     const service = new ConfigurationService();
-    assert.deepEqual(service.read(), { lineNumbers: true, wordWrap: true });
+    assert.deepEqual(service.read(), {
+      lineNumbers: true,
+      wordWrap: true,
+      math: true,
+      mermaid: true,
+      callouts: true
+    });
   });
 
   it("honours an explicit lineNumbers override", () => {
     __setConfigValues({ "editor.lineNumbers": false });
     const service = new ConfigurationService();
-    assert.deepEqual(service.read(), { lineNumbers: false, wordWrap: true });
+    assert.deepEqual(service.read(), {
+      lineNumbers: false,
+      wordWrap: true,
+      math: true,
+      mermaid: true,
+      callouts: true
+    });
   });
 
   it("defaults wordWrap to true when unset", () => {
@@ -40,7 +52,64 @@ describe("ConfigurationService.read", () => {
   it("honours an explicit wordWrap override", () => {
     __setConfigValues({ "editor.wordWrap": false });
     const service = new ConfigurationService();
-    assert.deepEqual(service.read(), { lineNumbers: true, wordWrap: false });
+    assert.deepEqual(service.read(), {
+      lineNumbers: true,
+      wordWrap: false,
+      math: true,
+      mermaid: true,
+      callouts: true
+    });
+  });
+
+  it("defaults math to true when unset", () => {
+    const service = new ConfigurationService();
+    assert.equal(service.read().math, true);
+  });
+
+  it("honours an explicit math override", () => {
+    __setConfigValues({ "preview.math": false });
+    const service = new ConfigurationService();
+    assert.deepEqual(service.read(), {
+      lineNumbers: true,
+      wordWrap: true,
+      math: false,
+      mermaid: true,
+      callouts: true
+    });
+  });
+
+  it("defaults mermaid to true when unset", () => {
+    const service = new ConfigurationService();
+    assert.equal(service.read().mermaid, true);
+  });
+
+  it("honours an explicit mermaid override", () => {
+    __setConfigValues({ "preview.mermaid": false });
+    const service = new ConfigurationService();
+    assert.deepEqual(service.read(), {
+      lineNumbers: true,
+      wordWrap: true,
+      math: true,
+      mermaid: false,
+      callouts: true
+    });
+  });
+
+  it("defaults callouts to true when unset", () => {
+    const service = new ConfigurationService();
+    assert.equal(service.read().callouts, true);
+  });
+
+  it("honours an explicit callouts override", () => {
+    __setConfigValues({ "preview.callouts": false });
+    const service = new ConfigurationService();
+    assert.deepEqual(service.read(), {
+      lineNumbers: true,
+      wordWrap: true,
+      math: true,
+      mermaid: true,
+      callouts: false
+    });
   });
 });
 

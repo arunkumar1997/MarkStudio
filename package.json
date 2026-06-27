@@ -116,8 +116,35 @@
           "default": true,
           "scope": "resource",
           "description": "Soft-wrap long lines in the MarkStudio source editor."
+        },
+        "markstudio.preview.math": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "Render inline ($…$) and block ($$…$$) math in the MarkStudio preview with KaTeX."
+        },
+        "markstudio.preview.mermaid": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "Render fenced ```mermaid code blocks as diagrams in the MarkStudio preview. The Mermaid library is lazy-loaded on first use."
+        },
+        "markstudio.preview.callouts": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "Render callout / admonition blockquotes (e.g. > [!NOTE], > [!WARNING], > [!TIP]) as styled boxes in the MarkStudio preview."
         }
       }
+    },
+    "views": {
+      "explorer": [
+        {
+          "id": "markstudio.outline",
+          "name": "MarkStudio Outline",
+          "when": "activeCustomEditorId == 'markstudio.editor'"
+        }
+      ]
     }
   },
   "scripts": {
@@ -142,11 +169,15 @@
     "@codemirror/state": "^6.4.1",
     "@codemirror/view": "^6.28.0",
     "@lezer/highlight": "^1.2.0",
-    "markdown-it": "^14.2.0"
+    "@vscode/markdown-it-katex": "^1.1.2",
+    "katex": "^0.17.0",
+    "markdown-it": "^14.2.0",
+    "mermaid": "^11.16.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
     "@types/jsdom": "^28.0.3",
+    "@types/katex": "^0.16.8",
     "@types/markdown-it": "^14.1.2",
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.85.0",

@@ -19,7 +19,10 @@ export class ConfigurationService {
     const config = vscode.workspace.getConfiguration(SECTION, resource ?? null);
     return {
       lineNumbers: config.get<boolean>("editor.lineNumbers", true),
-      wordWrap: config.get<boolean>("editor.wordWrap", true)
+      wordWrap: config.get<boolean>("editor.wordWrap", true),
+      math: config.get<boolean>("preview.math", true),
+      mermaid: config.get<boolean>("preview.mermaid", true),
+      callouts: config.get<boolean>("preview.callouts", true)
     };
   }
 

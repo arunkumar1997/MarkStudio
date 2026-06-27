@@ -20,6 +20,21 @@ export function buildWebviewHtml(
   const codiconsUri = webview.asWebviewUri(
     vscode.Uri.joinPath(extensionUri, "dist", "codicons", "codicon.css")
   );
+  // KaTeX stylesheet for math rendering in the preview (T-3.1, ADR-0015). Its
+  // fonts are referenced by relative `fonts/*` URLs, so loading the stylesheet
+  // through `asWebviewUri` is enough — the browser resolves the fonts next to
+  // it and the CSP `font-src ${webview.cspSource}` rule permits the fetch.
+  const katexUri = webview.asWebviewUri(
+    vscode.Uri.joinPath(extensionUri, "dist", "katex", "katex.min.css")
+  );
+  // Mermaid is shipped as a separate bundle and lazy-loaded on first use
+  // (T-3.2, ADR-0016). The webview reads this URI from the root element's
+  // `data-mermaid-src` and injects a nonce-bearing `<script>` only when a
+  // ```mermaid block is first rendered, so the heavy library never inflates
+  // the base webview download.
+  const mermaidUri = webview.asWebviewUri(
+    vscode.Uri.joinPath(extensionUri, "dist", "mermaid.js")
+  );
 
   const csp = [
     `default-src 'none'`,
@@ -36,11 +51,12 @@ export function buildWebviewHtml(
   <meta http-equiv="Content-Security-Policy" content="${csp}" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="${codiconsUri}" />
+  <link rel="stylesheet" href="${katexUri}" />
   <title>MarkStudio</title>
 </head>
 <body>
-  <main id="markstudio-root" aria-busy="true"></main>
-  <script nonce="${nonce}" src="${scriptUri}"></script>
+  <main id="markstudio-root" aria-busy="true" data-mermaid-src="${mermaidUri}"></main>
+  <script nonce="${nonce}" id="markstudio-bootstrap" src="${scriptUri}"></script>
 </body>
 </html>`;
 }

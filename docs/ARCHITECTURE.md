@@ -86,6 +86,11 @@ src/
 │   ├── wordCount.ts                  # pure computeDocumentStats (words/characters/reading time)
 │   └── WordCountStatusBar.ts         # StatusBarItem reflecting the active MarkStudio document (T-2.4)
 │
+├── outline/                      # Host-side document outline (T-2.2)
+│   ├── headings.ts                   # pure parseHeadings + buildHeadingTree (no `vscode`/DOM)
+│   ├── OutlineTreeProvider.ts        # vscode.TreeDataProvider backing the outline tree view
+│   └── registerOutline.ts            # wires the TreeView, follows the active doc, reveal command
+│
 └── webview/                      # Webview (browser) runtime — bundled separately
     ├── main.ts                       # builds the App Shell exactly once; mounts the editor
     ├── app/
@@ -125,6 +130,7 @@ Files are intentionally small and single-purpose. If a file grows past a single 
 | `ConfigurationService` | Read `markstudio.*` settings reactively | Cache settings without listening for changes |
 | `StateStore` | Persist workspace/global state via Memento | Store large blobs or document content |
 | `WordCountStatusBar` | Show word count + reading time for the active MarkStudio document in a native status-bar item (T-2.4) | Add custom webview chrome; recount synchronously on every keystroke |
+| `OutlineTreeProvider` / `registerOutline` | Back a native tree view with the active document's heading outline; navigate the editor on click (T-2.2) | Render the outline inside the webview; parse via the webview tokeniser |
 
 ### 4.2 Webview
 
@@ -189,6 +195,7 @@ Indicative message set (the source of truth is the code once it exists):
 | Host → Webview | `setContent` | `{ text }` | Revert / external change |
 | Host → Webview | `setLayoutMode` | `{ mode }` | App Shell layout-mode switch (T-106) — `split` / `editor-only` / `preview-only` |
 | Host → Webview | `configChanged` | `{ config }` | `markstudio.*` setting changed (T-111) — toggles line numbers etc. live via a CM6 `Compartment` |
+| Host → Webview | `revealLine` | `{ line }` | Scroll the editor to a heading and place the cursor there (T-2.2) — fired by the document-outline tree view |
 | Webview → Host | `ready` | `{}` | Webview finished building |
 | Webview → Host | `edit` | `{ changes: EditChange[], text }` | A minimal content change (CM6 diff). `text` enables the host's echo guard. |
 | Webview → Host | `requestSave` | `{}` | User triggered save in-webview (planned) |
@@ -233,6 +240,7 @@ Performance budgets live in each feature's [implementation/](implementation/) re
 * The webview uses a strict **Content Security Policy** with a per-load **nonce**; only bundled scripts with the nonce execute.
 * All local resources are loaded via `webview.asWebviewUri`.
 * No remote content is loaded by default. User Markdown is rendered through markdown-it with safe defaults; raw HTML handling is an explicit, documented decision when added.
+* Asset stylesheets and fonts (Codicons, KaTeX) ship in `dist/` and load via `asWebviewUri`; KaTeX fonts resolve next to `katex.min.css` and are served under the existing `font-src ${webview.cspSource}` rule (T-3.1, ADR-0015). Mermaid is **not** in the main webview bundle — it ships as a separate `dist/mermaid.js` lazy-loaded on first use via a nonce-bearing injected `<script>` (T-3.2, ADR-0016).
 
 ---
 
@@ -243,7 +251,7 @@ Later phases (math, mermaid, callouts, wiki links, backlinks — see [ROADMAP.md
 * **CodeMirror 6 extensions** for editor-side behavior.
 * **markdown-it plugins** for preview-side rendering.
 
-Both plug into well-defined seams (`editor/extensions.ts`, `preview/PreviewRenderer.ts`) so new syntax features degrade gracefully when disabled and never require recreating the editor or webview. A public Plugin/Theme API (Phase 6) is explicitly deferred until the core is unshakeable.
+Both plug into well-defined seams (`editor/extensions.ts`, `preview/PreviewRenderer.ts`) so new syntax features degrade gracefully when disabled and never require recreating the editor or webview. Two such features have landed: **KaTeX math** attaches as a markdown-it plugin behind the `markstudio.preview.math` setting (T-3.1, ADR-0015), and **Mermaid diagrams** attach as a markdown-it fence override behind the `markstudio.preview.mermaid` setting (T-3.2, ADR-0016), lazy-loaded from a separate bundle on first use. In both cases `PreviewRenderer.setConfig` rebuilds the markdown-it instance when the toggle flips, never on the hot path. A public Plugin/Theme API (Phase 6) is explicitly deferred until the core is unshakeable.
 
 ---
 

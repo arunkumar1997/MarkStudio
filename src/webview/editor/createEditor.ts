@@ -64,6 +64,7 @@ export interface MarkStudioEditor {
   readonly view: EditorView;
   setContentFromHost(text: string): void;
   setConfig(config: MarkStudioConfig): void;
+  revealLine(line: number): void;
   focus(): void;
   destroy(): void;
 }
@@ -101,13 +102,13 @@ export function createEditor(options: CreateEditorOptions): MarkStudioEditor {
 
   const snapshotListener = onSnapshotChange
     ? EditorView.updateListener.of((update) => {
-      if (update.selectionSet || update.docChanged) {
-        scheduleSnapshot();
-      }
-    })
+        if (update.selectionSet || update.docChanged) {
+          scheduleSnapshot();
+        }
+      })
     : EditorView.updateListener.of(() => {
-      /* no-op: snapshots not requested */
-    });
+        /* no-op: snapshots not requested */
+      });
 
   const initialSelection = resolveInitialSelection(
     initialCursor,
@@ -202,6 +203,19 @@ export function createEditor(options: CreateEditorOptions): MarkStudioEditor {
         ]
       });
     },
+    revealLine(line: number): void {
+      // Scroll the source editor to a 0-based document line and place the
+      // cursor at its start (T-2.2, document-outline navigation). The line is
+      // clamped to the document so a stale outline click can never throw.
+      const doc = view.state.doc;
+      const lineNumber = Math.min(Math.max(Math.floor(line) + 1, 1), doc.lines);
+      const target = doc.line(lineNumber);
+      view.dispatch({
+        selection: EditorSelection.cursor(target.from),
+        effects: EditorView.scrollIntoView(target.from, { y: "start" })
+      });
+      view.focus();
+    },
     focus(): void {
       view.focus();
     },
@@ -266,7 +280,7 @@ function computeMinimalChange(
   while (
     suffix < maxSuffix &&
     current.charCodeAt(currentLength - 1 - suffix) ===
-    next.charCodeAt(nextLength - 1 - suffix)
+      next.charCodeAt(nextLength - 1 - suffix)
   ) {
     suffix++;
   }

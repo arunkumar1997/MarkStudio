@@ -15,6 +15,10 @@
 // document (CODING_GUIDELINES.md §8, ARCHITECTURE.md §4.2 / §8).
 
 import MarkdownIt from "markdown-it";
+import markdownItKatex from "@vscode/markdown-it-katex";
+import type { MarkStudioConfig } from "../../messaging/messages";
+import { MERMAID_BLOCK_CLASS, renderMermaidBlocks } from "./mermaid";
+import { applyCallouts } from "./callouts";
 
 type Token = ReturnType<MarkdownIt["parse"]>[number];
 
@@ -37,6 +41,12 @@ export interface PreviewBlock {
 
 export interface PreviewRenderer {
   update(text: string): void;
+  // Re-read the resolved settings (T-3.1, T-3.2, T-3.3). The `math`, `mermaid`
+  // and `callouts` flags change how markdown-it tokenises/renders, so toggling
+  // any of them rebuilds the instance and re-renders the last text — applied
+  // live without a reload. Other settings that do not affect the preview are
+  // ignored.
+  setConfig(config: MarkStudioConfig): void;
   // Live, document-ordered list of rendered blocks with their source lines.
   // Returned array is owned by the renderer; callers must not mutate it.
   getBlocks(): ReadonlyArray<PreviewBlock>;
@@ -47,16 +57,14 @@ export interface PreviewRenderer {
 // and long enough that bursts of keystrokes coalesce into a single render.
 const DEBOUNCE_MS = 40;
 
-export function createPreviewRenderer(parent: HTMLElement): PreviewRenderer {
-  const md = new MarkdownIt({
-    // Raw HTML disabled by default for safety (ADR-0008). Phase 3 may revisit
-    // with an explicit security review.
-    html: false,
-    linkify: true,
-    typographer: false,
-    breaks: false,
-    xhtmlOut: false
-  });
+export function createPreviewRenderer(
+  parent: HTMLElement,
+  initialConfig: MarkStudioConfig
+): PreviewRenderer {
+  let mathEnabled = initialConfig.math;
+  let mermaidEnabled = initialConfig.mermaid;
+  let calloutsEnabled = initialConfig.callouts;
+  let md = createMarkdownIt(mathEnabled, mermaidEnabled, calloutsEnabled);
 
   const root = document.createElement("article");
   root.className = "markstudio-preview-content";
@@ -99,6 +107,13 @@ export function createPreviewRenderer(parent: HTMLElement): PreviewRenderer {
       lastLine = line < 0 ? lastLine : line;
       blocks[i].startLine = lastLine;
     }
+    // Lazily render any new Mermaid diagrams the patch inserted (T-3.2). This
+    // is async and fire-and-forget, so the hot render path stays synchronous;
+    // unchanged diagram blocks keep their already-rendered SVG (their cached
+    // placeholder HTML is unchanged, so `patch` preserves the node).
+    if (mermaidEnabled) {
+      renderMermaidBlocks(root);
+    }
   }
 
   return {
@@ -106,6 +121,23 @@ export function createPreviewRenderer(parent: HTMLElement): PreviewRenderer {
       pendingText = text;
       if (timer === null) {
         timer = window.setTimeout(flush, DEBOUNCE_MS);
+      }
+    },
+    setConfig(config: MarkStudioConfig): void {
+      if (
+        config.math === mathEnabled &&
+        config.mermaid === mermaidEnabled &&
+        config.callouts === calloutsEnabled
+      ) {
+        return;
+      }
+      mathEnabled = config.math;
+      mermaidEnabled = config.mermaid;
+      calloutsEnabled = config.callouts;
+      md = createMarkdownIt(mathEnabled, mermaidEnabled, calloutsEnabled);
+      // Force a re-render of the current document under the new pipeline.
+      if (lastRendered !== null) {
+        render(lastRendered);
       }
     },
     getBlocks(): ReadonlyArray<PreviewBlock> {
@@ -121,6 +153,64 @@ export function createPreviewRenderer(parent: HTMLElement): PreviewRenderer {
       root.replaceChildren();
       root.remove();
     }
+  };
+}
+
+// Build a markdown-it instance, optionally wired with KaTeX math rendering
+// (T-3.1, ADR-0015), Mermaid diagram blocks (T-3.2, ADR-0016) and callout
+// boxes (T-3.3). Rebuilt (not mutated) whenever a preview-affecting setting
+// flips, because markdown-it plugins/rules cannot be cleanly detached once
+// applied; the rebuild is a settings-change event, never a per-keystroke cost.
+function createMarkdownIt(
+  math: boolean,
+  mermaid: boolean,
+  callouts: boolean
+): MarkdownIt {
+  const md = new MarkdownIt({
+    // Raw HTML disabled by default for safety (ADR-0008). Phase 3 may revisit
+    // with an explicit security review.
+    html: false,
+    linkify: true,
+    typographer: false,
+    breaks: false,
+    xhtmlOut: false
+  });
+  if (math) {
+    md.use(markdownItKatex, {
+      // Never throw on malformed input: KaTeX renders the offending source in
+      // its error color instead, so a typo can never break the whole preview.
+      throwOnError: false
+    });
+  }
+  if (mermaid) {
+    applyMermaidFence(md);
+  }
+  if (callouts) {
+    applyCallouts(md);
+  }
+  return md;
+}
+
+// Override the fence renderer so a ```mermaid block emits a placeholder
+// container holding the (escaped) diagram source instead of a `<pre><code>`
+// (T-3.2). The async Mermaid pass (`renderMermaidBlocks`) later replaces the
+// container's contents with the rendered SVG. Because the placeholder HTML
+// encodes the source, an edit to the diagram changes the cached block HTML and
+// `patch` swaps in a fresh, unrendered container; an unchanged diagram keeps
+// its node (and its already-rendered SVG). All other fences fall through to
+// markdown-it's default renderer, so non-Mermaid code blocks are untouched.
+function applyMermaidFence(md: MarkdownIt): void {
+  const defaultFence = md.renderer.rules.fence;
+  md.renderer.rules.fence = (tokens, idx, options, env, self): string => {
+    const info = tokens[idx].info.trim().split(/\s+/, 1)[0].toLowerCase();
+    if (info === "mermaid") {
+      return `<div class="${MERMAID_BLOCK_CLASS}">${md.utils.escapeHtml(
+        tokens[idx].content
+      )}</div>`;
+    }
+    return defaultFence
+      ? defaultFence(tokens, idx, options, env, self)
+      : self.renderToken(tokens, idx, options);
   };
 }
 

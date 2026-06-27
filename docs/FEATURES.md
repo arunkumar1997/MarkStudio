@@ -19,10 +19,10 @@
 | External-change reconciliation | Shipped | On-disk changes (revert, `git pull`, another editor's save, an external formatter) reconcile through VS Code's managed `TextDocument` + `onDidChangeTextDocument`; the webview applies the new text as a **minimal diff** (common prefix/suffix trimmed) so the cursor is preserved when the edit is elsewhere (T-110, ADR-0009). |
 | View-state persistence | Shipped | CodeMirror cursor (anchor + head) and scroll position snapshot/restore via `vscode.setState()` (T-109, debounced 250 ms); split ratio + last layout mode persist alongside them (T-106). Per-file last layout mode also survives full extension reloads via a workspace `Memento` (`StateStore`, T-109). |
 | Core commands | Shipped | Layout commands (T-106): `MarkStudio: Show Editor and Preview`, `Show Editor Only`, `Show Preview Only`. Convenience commands (T-108): `Open in MarkStudio`, `Toggle Preview`, `Toggle Split View`, `Focus Editor`, `Focus Preview`. Default keybindings — `Ctrl+K V` (toggle preview), `Ctrl+K Ctrl+V` (toggle split), `Ctrl+K Ctrl+E` (focus editor), `Ctrl+K Ctrl+R` (focus preview) — are gated to MarkStudio editors. |
-| Toolbar (Codicons) | In progress | Three layout-mode buttons shipped in the App Shell toolbar (T-107) — source-only, split, preview-only. Word wrap, search, and outline buttons land alongside their underlying features (T-2.x). |
+| Toolbar (Codicons) | In progress | Three layout-mode buttons shipped in the App Shell toolbar (T-107) — source-only, split, preview-only. Word wrap and search buttons land alongside their underlying features (T-2.x). The document outline ships as a native tree view rather than a toolbar button (T-2.2). |
 | Theme integration | Shipped | All styling from `--vscode-*` variables; correct in light, dark, and high contrast (T-104 — verified in EDH outstanding). |
 | Scroll synchronization | Shipped | In split mode, scrolling either pane scrolls the other to the matching Markdown block; preview blocks are anchored to source lines via the markdown-it token map and interpolated for smooth alignment, with per-direction feedback suppression (T-2.1). |
-| Configuration / settings | Shipped | `markstudio.*` settings are read reactively host-side (`ConfigurationService`) and applied live without a reload. Settings: `markstudio.editor.lineNumbers` (default on) toggles the CodeMirror line-number gutter (T-111, ADR-0010); `markstudio.editor.wordWrap` (default on) toggles soft-wrap (T-2.5) — each via a CM6 `Compartment`. Future options extend `MarkStudioConfig` + the `configChanged` message. |
+| Configuration / settings | Shipped | `markstudio.*` settings are read reactively host-side (`ConfigurationService`) and applied live without a reload. Settings: `markstudio.editor.lineNumbers` (default on) toggles the CodeMirror line-number gutter (T-111, ADR-0010); `markstudio.editor.wordWrap` (default on) toggles soft-wrap (T-2.5) — each via a CM6 `Compartment`; `markstudio.preview.math` (default on) toggles KaTeX math rendering in the preview (T-3.1, ADR-0015); `markstudio.preview.mermaid` (default on) toggles Mermaid diagram rendering (T-3.2, ADR-0016); `markstudio.preview.callouts` (default on) toggles callout/admonition rendering (T-3.3, ADR-0017). Future options extend `MarkStudioConfig` + the `configChanged` message. |
 
 ---
 
@@ -31,7 +31,7 @@
 | Feature | Status | Description |
 | ------- | ------ | ----------- |
 | Scroll synchronization | Shipped | Editor and preview scroll positions stay aligned, both directions (T-2.1; delivered early during Phase 1). |
-| Document outline | Planned | Navigable heading outline that updates incrementally. |
+| Document outline | Shipped | Navigable heading outline in a native tree view (`MarkStudio Outline`, Explorer container) that follows the active MarkStudio editor and rebuilds as headings change; clicking a heading scrolls the editor to it. Headings are parsed host-side (ATX + setext, skipping fenced code blocks and YAML front matter); navigation is a `revealLine` message (T-2.2, ADR-0014). |
 | Search & replace | Shipped | In-editor find/replace built on CodeMirror's `@codemirror/search`: the panel mounts at the top (like VS Code's find widget), opens with `Ctrl/Cmd+F`, supports replace, match-case, regexp, and whole-word, and is themed entirely via `--vscode-*` variables (T-2.3). |
 | Word count & reading time | Shipped | Native status-bar indicator showing live word count for the active MarkStudio editor; tooltip adds characters and estimated reading time (~200 wpm). Computed host-side from the document; debounced; no custom UI (T-2.4). |
 | Word wrap & multiple cursors | Shipped | `markstudio.editor.wordWrap` (default on) toggles soft-wrap live via a CM6 `Compartment`, mirroring the line-numbers pattern (T-2.5, T-111). Multiple cursors / rectangular selection ship with the editor: Alt+click adds a cursor, Ctrl/Cmd+click adds a selection, and Alt+drag makes a rectangular selection (T-104). |
@@ -44,9 +44,9 @@ Each attaches as a CodeMirror 6 extension and/or markdown-it plugin and **degrad
 
 | Feature | Status | Description |
 | ------- | ------ | ----------- |
-| Math | Future | Inline and block math rendering. |
-| Mermaid diagrams | Future | Render fenced `mermaid` blocks in preview. |
-| Callouts / admonitions | Future | Styled note/warning/tip blocks. |
+| Math | Shipped | Inline (`$…$`) and block (`$$…$$`) math rendered with KaTeX in the preview; toggleable via `markstudio.preview.math` (default on) and degrades to literal text when off (T-3.1, ADR-0015). |
+| Mermaid diagrams | Shipped | Fenced ```mermaid blocks render as diagrams in the preview; the Mermaid library is lazy-loaded on first use; toggleable via `markstudio.preview.mermaid` (default on) and degrades to a plain code block when off (T-3.2, ADR-0016). |
+| Callouts / admonitions | Shipped | GitHub-style callout blockquotes (`> [!NOTE]`, `> [!TIP]`, `> [!IMPORTANT]`, `> [!WARNING]`, `> [!CAUTION]`) render as themed boxes with a Codicon icon + title in the preview; a dependency-free markdown-it core rule; toggleable via `markstudio.preview.callouts` (default on) and degrades to an ordinary blockquote when off (T-3.3, ADR-0017). |
 | Wiki links | Future | `[[note]]` linking syntax. |
 | Footnotes & full GFM | Future | Footnotes, task lists, tables, strikethrough. |
 

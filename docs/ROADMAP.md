@@ -49,31 +49,31 @@ A native Markdown editor with split view and live preview. Nothing flashy — ju
 
 ---
 
-## Phase 2 — Editing Quality · *In progress*
+## Phase 2 — Editing Quality · *Done*
 
 Make the core comfortable for daily, long-form writing.
 
 **Milestones**
 * M2.1 — Scroll synchronization between editor and preview *(Done — T-2.1, delivered early during Phase 1)*
-* M2.2 — Document outline (headings) with navigation
+* M2.2 — Document outline (headings) with navigation *(Done — T-2.2, ADR-0014)*
 * M2.3 — In-editor search and replace *(Done — T-2.3)*
 * M2.4 — Word count and reading-time indicator *(Done — T-2.4)*
 * M2.5 — Word wrap toggle and multiple cursors *(Done — T-2.5)*
 
 **Exit criteria**
-* Scroll sync feels natural in both directions without jitter.
-* Outline updates incrementally as headings change.
+* Scroll sync feels natural in both directions without jitter. *(Met — T-2.1)*
+* Outline updates incrementally as headings change. *(Met — T-2.2; rebuilt on edits, debounced)*
 
 ---
 
-## Phase 3 — Modern Markdown · *Planned*
+## Phase 3 — Modern Markdown · *In progress*
 
 The syntax extensions that make Markdown feel modern. Each attaches as a CodeMirror 6 extension and/or markdown-it plugin and **degrades gracefully** when disabled.
 
 **Milestones**
-* M3.1 — Math rendering (inline and block)
-* M3.2 — Mermaid diagrams
-* M3.3 — Callouts / admonitions
+* M3.1 — Math rendering (inline and block) *(Done — T-3.1, ADR-0015)*
+* M3.2 — Mermaid diagrams *(Done — T-3.2, ADR-0016)*
+* M3.3 — Callouts / admonitions *(Done — T-3.3, ADR-0017)*
 * M3.4 — Wiki-style links (`[[...]]`)
 * M3.5 — Footnotes and GFM completeness (tables, task lists, strikethrough)
 

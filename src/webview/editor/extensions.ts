@@ -114,9 +114,9 @@ const markstudioTheme = EditorView.theme({
     color: "var(--vscode-editorLineNumber-foreground)"
   },
   ".cm-focused .cm-activeLineGutter, .cm-focused .cm-lineNumbers .cm-gutterElement.cm-activeLine":
-  {
-    color: "var(--vscode-editorLineNumber-activeForeground)"
-  },
+    {
+      color: "var(--vscode-editorLineNumber-activeForeground)"
+    },
   "&.cm-focused": {
     outline: "none"
   },
@@ -144,18 +144,18 @@ const markstudioTheme = EditorView.theme({
     fontSize: "var(--vscode-font-size, 13px)"
   },
   ".cm-panel.cm-search input[name=search], .cm-panel.cm-search input[name=replace]":
-  {
-    backgroundColor: "var(--vscode-input-background)",
-    color: "var(--vscode-input-foreground)",
-    border: "1px solid var(--vscode-input-border, transparent)",
-    borderRadius: "2px",
-    padding: "2px 4px"
-  },
+    {
+      backgroundColor: "var(--vscode-input-background)",
+      color: "var(--vscode-input-foreground)",
+      border: "1px solid var(--vscode-input-border, transparent)",
+      borderRadius: "2px",
+      padding: "2px 4px"
+    },
   ".cm-panel.cm-search input[name=search]:focus, .cm-panel.cm-search input[name=replace]:focus":
-  {
-    outline: "1px solid var(--vscode-focusBorder)",
-    outlineOffset: "-1px"
-  },
+    {
+      outline: "1px solid var(--vscode-focusBorder)",
+      outlineOffset: "-1px"
+    },
   ".cm-panel.cm-search button:not([name=close]), .cm-button": {
     backgroundColor:
       "var(--vscode-button-secondaryBackground, var(--vscode-button-background))",

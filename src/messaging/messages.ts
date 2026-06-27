@@ -27,6 +27,19 @@ export interface MarkStudioConfig {
   readonly lineNumbers: boolean;
   // `markstudio.editor.wordWrap` — soft-wrap long lines in the source editor.
   readonly wordWrap: boolean;
+  // `markstudio.preview.math` — render inline (`$…$`) and block (`$$…$$`)
+  // math in the preview with KaTeX (T-3.1, M3.1). When off the delimiters
+  // are left as literal text so rendering never breaks.
+  readonly math: boolean;
+  // `markstudio.preview.mermaid` — render fenced ```mermaid blocks as
+  // diagrams in the preview (T-3.2, M3.2). When off the block is shown as a
+  // plain code block so rendering never breaks. The Mermaid library is lazy-
+  // loaded on first use, so this flag controls rendering, not bundling.
+  readonly mermaid: boolean;
+  // `markstudio.preview.callouts` — render `> [!NOTE]`-style blockquotes as
+  // themed callout boxes in the preview (T-3.3, M3.3). When off the block is
+  // shown as an ordinary blockquote so rendering never breaks.
+  readonly callouts: boolean;
 }
 
 // First content load. Sent once the webview signals `ready`.
@@ -98,6 +111,15 @@ export interface ConfigChangedMessage {
   readonly config: MarkStudioConfig;
 }
 
+// Host asks the webview to scroll the source editor to a document line and
+// place the cursor there (T-2.2). Fired when a heading is clicked in the
+// document-outline tree view. `line` is a 0-based source line; the webview
+// clamps it to the document, focuses CodeMirror, and reveals the line.
+export interface RevealLineMessage {
+  readonly type: "revealLine";
+  readonly line: number;
+}
+
 // Either direction. Carries a human-readable diagnostic.
 export interface ErrorMessage {
   readonly type: "error";
@@ -112,6 +134,7 @@ export type HostToWebviewMessage =
   | ToggleSplitMessage
   | FocusPaneMessage
   | ConfigChangedMessage
+  | RevealLineMessage
   | ErrorMessage;
 
 // ─── Webview → Host ─────────────────────────────────────────────────────────
@@ -179,7 +202,10 @@ function isMarkStudioConfig(value: unknown): value is MarkStudioConfig {
   return (
     isObject(value) &&
     typeof value.lineNumbers === "boolean" &&
-    typeof value.wordWrap === "boolean"
+    typeof value.wordWrap === "boolean" &&
+    typeof value.math === "boolean" &&
+    typeof value.mermaid === "boolean" &&
+    typeof value.callouts === "boolean"
   );
 }
 
@@ -223,6 +249,8 @@ export function isHostToWebviewMessage(
       );
     case "configChanged":
       return isMarkStudioConfig(value.config);
+    case "revealLine":
+      return typeof value.line === "number";
     case "error":
       return typeof value.message === "string";
     default:

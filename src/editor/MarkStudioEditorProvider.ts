@@ -29,6 +29,10 @@ class MarkStudioEditorController {
   public focusPane(pane: FocusablePane): void {
     this.bus.post({ type: "focusPane", pane });
   }
+
+  public revealLine(line: number): void {
+    this.bus.post({ type: "revealLine", line });
+  }
 }
 
 export type { MarkStudioEditorController };

@@ -15,7 +15,16 @@ import {
   createPreviewRenderer,
   type PreviewRenderer
 } from "../../src/webview/preview/PreviewRenderer";
+import type { MarkStudioConfig } from "../../src/messaging/messages";
 import { createContainer, removeContainer } from "./_setup/dom";
+
+const CONFIG: MarkStudioConfig = {
+  lineNumbers: true,
+  wordWrap: true,
+  math: true,
+  mermaid: true,
+  callouts: true
+};
 
 // The renderer debounces updates by 40 ms; wait past that to read the result.
 function flush(): Promise<void> {
@@ -28,7 +37,7 @@ describe("createPreviewRenderer — incremental DOM patching", () => {
 
   beforeEach(() => {
     container = createContainer();
-    renderer = createPreviewRenderer(container);
+    renderer = createPreviewRenderer(container, CONFIG);
   });
 
   afterEach(() => {
@@ -108,5 +117,270 @@ describe("createPreviewRenderer — incremental DOM patching", () => {
     const children = Array.from(root().children);
     assert.equal(children.length, 1);
     assert.equal(children[0].textContent, "third");
+  });
+});
+
+describe("createPreviewRenderer — math rendering (T-3.1)", () => {
+  let container: HTMLElement;
+  let renderer: PreviewRenderer | null;
+
+  beforeEach(() => {
+    container = createContainer();
+    renderer = null;
+  });
+
+  afterEach(() => {
+    renderer?.destroy();
+    removeContainer(container);
+  });
+
+  function root(): HTMLElement {
+    const el = container.querySelector(".markstudio-preview-content");
+    assert.ok(el, "preview root should exist");
+    return el as HTMLElement;
+  }
+
+  it("renders inline and block math with KaTeX when math is enabled", async () => {
+    renderer = createPreviewRenderer(container, CONFIG);
+    renderer.update("Inline $a^2 + b^2 = c^2$ math.\n\n$$\\int_0^1 x\\,dx$$");
+    await flush();
+
+    assert.ok(
+      root().querySelector(".katex"),
+      "KaTeX output should be present when math is on"
+    );
+  });
+
+  it("leaves math delimiters as text when math is disabled", async () => {
+    renderer = createPreviewRenderer(container, {
+      ...CONFIG,
+      math: false
+    });
+    renderer.update("Inline $a^2 + b^2 = c^2$ math.");
+    await flush();
+
+    assert.equal(
+      root().querySelector(".katex"),
+      null,
+      "no KaTeX output should render when math is off"
+    );
+    assert.match(root().textContent ?? "", /\$a\^2 \+ b\^2 = c\^2\$/);
+  });
+
+  it("re-renders live when the math setting is toggled via setConfig", async () => {
+    renderer = createPreviewRenderer(container, { ...CONFIG, math: false });
+    renderer.update("$a^2$");
+    await flush();
+    assert.equal(root().querySelector(".katex"), null);
+
+    renderer.setConfig({ ...CONFIG, math: true });
+    await flush();
+    assert.ok(
+      root().querySelector(".katex"),
+      "toggling math on should render KaTeX without a new update"
+    );
+  });
+});
+
+describe("createPreviewRenderer — mermaid rendering (T-3.2)", () => {
+  let container: HTMLElement;
+  let renderer: PreviewRenderer | null;
+
+  beforeEach(() => {
+    container = createContainer();
+    renderer = null;
+  });
+
+  afterEach(() => {
+    renderer?.destroy();
+    removeContainer(container);
+  });
+
+  function root(): HTMLElement {
+    const el = container.querySelector(".markstudio-preview-content");
+    assert.ok(el, "preview root should exist");
+    return el as HTMLElement;
+  }
+
+  // The Mermaid library is lazy-loaded by injecting a <script> that is not
+  // available under jsdom, so these tests assert the markdown-it seam only:
+  // the placeholder container the async pass later fills, and graceful
+  // degradation to a plain code block when the feature is off.
+
+  it("emits a mermaid placeholder container carrying the diagram source", async () => {
+    renderer = createPreviewRenderer(container, CONFIG);
+    renderer.update("```mermaid\ngraph TD; A-->B;\n```");
+    await flush();
+
+    const block = root().querySelector(".markstudio-mermaid");
+    assert.ok(
+      block,
+      "a mermaid container should be emitted when mermaid is on"
+    );
+    assert.match(block?.textContent ?? "", /graph TD; A-->B;/);
+    assert.equal(
+      root().querySelector("pre"),
+      null,
+      "a mermaid block should not render as a plain code block when on"
+    );
+  });
+
+  it("renders a plain code block when mermaid is disabled", async () => {
+    renderer = createPreviewRenderer(container, { ...CONFIG, mermaid: false });
+    renderer.update("```mermaid\ngraph TD; A-->B;\n```");
+    await flush();
+
+    assert.equal(
+      root().querySelector(".markstudio-mermaid"),
+      null,
+      "no mermaid container should render when mermaid is off"
+    );
+    const pre = root().querySelector("pre");
+    assert.ok(pre, "a mermaid block should fall back to a code block when off");
+    assert.match(pre?.textContent ?? "", /graph TD; A-->B;/);
+  });
+
+  it("leaves non-mermaid code fences untouched when mermaid is enabled", async () => {
+    renderer = createPreviewRenderer(container, CONFIG);
+    renderer.update("```js\nconst a = 1;\n```");
+    await flush();
+
+    assert.equal(
+      root().querySelector(".markstudio-mermaid"),
+      null,
+      "a non-mermaid fence should not become a mermaid container"
+    );
+    assert.ok(
+      root().querySelector("pre"),
+      "a non-mermaid fence should render as a normal code block"
+    );
+  });
+
+  it("toggles a mermaid block to a placeholder live via setConfig", async () => {
+    renderer = createPreviewRenderer(container, { ...CONFIG, mermaid: false });
+    renderer.update("```mermaid\ngraph TD; A-->B;\n```");
+    await flush();
+    assert.ok(root().querySelector("pre"));
+    assert.equal(root().querySelector(".markstudio-mermaid"), null);
+
+    renderer.setConfig({ ...CONFIG, mermaid: true });
+    await flush();
+    assert.ok(
+      root().querySelector(".markstudio-mermaid"),
+      "toggling mermaid on should swap the code block for a diagram container"
+    );
+  });
+});
+
+describe("createPreviewRenderer — callout rendering (T-3.3)", () => {
+  let container: HTMLElement;
+  let renderer: PreviewRenderer | null;
+
+  beforeEach(() => {
+    container = createContainer();
+    renderer = null;
+  });
+
+  afterEach(() => {
+    renderer?.destroy();
+    removeContainer(container);
+  });
+
+  function root(): HTMLElement {
+    const el = container.querySelector(".markstudio-preview-content");
+    assert.ok(el, "preview root should exist");
+    return el as HTMLElement;
+  }
+
+  it("renders a styled callout box with an icon + title when callouts are on", async () => {
+    renderer = createPreviewRenderer(container, CONFIG);
+    renderer.update("> [!NOTE]\n> Body text.");
+    await flush();
+
+    const callout = root().querySelector(".markstudio-callout");
+    assert.ok(callout, "a callout container should be emitted when on");
+    assert.equal(
+      callout?.tagName,
+      "DIV",
+      "the callout should be a div, not a blockquote"
+    );
+    assert.ok(
+      callout?.classList.contains("markstudio-callout-note"),
+      "the per-type modifier class should be applied"
+    );
+    assert.ok(
+      callout?.querySelector(".markstudio-callout-title .codicon"),
+      "the title should carry a codicon icon"
+    );
+    assert.match(
+      callout?.querySelector(".markstudio-callout-title-text")?.textContent ??
+        "",
+      /Note/
+    );
+    assert.match(callout?.textContent ?? "", /Body text\./);
+    assert.equal(
+      root().querySelector("blockquote"),
+      null,
+      "a callout should not also render as a blockquote"
+    );
+  });
+
+  it("uses a custom title when one follows the marker", async () => {
+    renderer = createPreviewRenderer(container, CONFIG);
+    renderer.update("> [!WARNING] Heads up\n> Careful now.");
+    await flush();
+
+    const title = root().querySelector(".markstudio-callout-title-text");
+    assert.match(title?.textContent ?? "", /Heads up/);
+    assert.ok(
+      root()
+        .querySelector(".markstudio-callout")
+        ?.classList.contains("markstudio-callout-warning")
+    );
+  });
+
+  it("falls back to a plain blockquote when callouts are disabled", async () => {
+    renderer = createPreviewRenderer(container, { ...CONFIG, callouts: false });
+    renderer.update("> [!NOTE]\n> Body text.");
+    await flush();
+
+    assert.equal(
+      root().querySelector(".markstudio-callout"),
+      null,
+      "no callout container should render when callouts are off"
+    );
+    const quote = root().querySelector("blockquote");
+    assert.ok(quote, "a callout block should fall back to a blockquote");
+    assert.match(quote?.textContent ?? "", /\[!NOTE\]/);
+  });
+
+  it("leaves an ordinary blockquote untouched when callouts are enabled", async () => {
+    renderer = createPreviewRenderer(container, CONFIG);
+    renderer.update("> Just a quote.");
+    await flush();
+
+    assert.equal(
+      root().querySelector(".markstudio-callout"),
+      null,
+      "a normal blockquote should not become a callout"
+    );
+    const quote = root().querySelector("blockquote");
+    assert.ok(quote, "an ordinary blockquote should still render");
+    assert.match(quote?.textContent ?? "", /Just a quote\./);
+  });
+
+  it("toggles a blockquote to a callout live via setConfig", async () => {
+    renderer = createPreviewRenderer(container, { ...CONFIG, callouts: false });
+    renderer.update("> [!TIP]\n> Useful hint.");
+    await flush();
+    assert.ok(root().querySelector("blockquote"));
+    assert.equal(root().querySelector(".markstudio-callout"), null);
+
+    renderer.setConfig({ ...CONFIG, callouts: true });
+    await flush();
+    assert.ok(
+      root().querySelector(".markstudio-callout-tip"),
+      "toggling callouts on should swap the blockquote for a callout box"
+    );
   });
 });
