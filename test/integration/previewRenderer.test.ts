@@ -315,7 +315,7 @@ describe("createPreviewRenderer — callout rendering (T-3.3)", () => {
     );
     assert.match(
       callout?.querySelector(".markstudio-callout-title-text")?.textContent ??
-        "",
+      "",
       /Note/
     );
     assert.match(callout?.textContent ?? "", /Body text\./);
