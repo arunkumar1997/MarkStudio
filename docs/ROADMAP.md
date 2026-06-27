@@ -83,18 +83,18 @@ The syntax extensions that make Markdown feel modern. Each attaches as a CodeMir
 
 ---
 
-## Phase 4 — Knowledge Management · *Planned*
+## Phase 4 — Knowledge Management · *In progress*
 
 Begin the PKM layer — only after the core is unshakeable.
 
 **Milestones**
-* M4.1 — Backlinks panel
+* M4.1 — Backlinks panel *(Done — T-4.1; native `MarkStudio Backlinks` tree view over a host-side, async, watcher-backed link index; lands the wiki-link resolver deferred from Phase 3, ADR-0020)*
 * M4.2 — Hover preview for links
 * M4.3 — Embedded notes / transclusion
 * M4.4 — Graph view
 
 **Exit criteria**
-* Link indexing scales to a large workspace without blocking the UI.
+* Link indexing scales to a large workspace without blocking the UI. *(On track — the initial scan is async/batched and kicked off but not awaited; watcher updates are debounced and incremental, ADR-0020)*
 
 ---
 

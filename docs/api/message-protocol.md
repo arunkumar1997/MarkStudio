@@ -29,6 +29,8 @@
 
 The host suppresses `setContent` echoes of its own webview-originated edits via a text-equality guard, so the webview never receives a copy of an edit it just sent.
 
+> **No protocol change in T-4.1 (Backlinks panel, M4.1).** Like the document outline (T-2.2), the backlinks panel is entirely host-side — a `vscode.TreeDataProvider` over a workspace link index — and navigates by opening the source note in a native text editor (`showTextDocument`), not via the webview. It adds **no** host ⇄ webview message. A future in-preview wiki-link navigation feature (T-4.1b) would add a webview → host message; this sprint does not.
+
 ## 3. Webview → Host
 
 | `type`              | Payload                                                | Sent when                                                                                       |

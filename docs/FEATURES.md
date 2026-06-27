@@ -56,7 +56,7 @@ Each attaches as a CodeMirror 6 extension and/or markdown-it plugin and **degrad
 
 | Feature | Status | Description |
 | ------- | ------ | ----------- |
-| Backlinks | Future | Panel showing notes that link to the current note. |
+| Backlinks | Shipped | Native `MarkStudio Backlinks` tree view (Explorer container) listing every other workspace note that links to the active note via a wiki-link (`[[note]]`), one node per source note + linking line; clicking opens the source at the linking line. Backed by a host-side workspace link index — an async, non-blocking scan kept live by a debounced `FileSystemWatcher` — and the wiki-link resolver deferred from Phase 3 (case-insensitive basename, path-qualified relative-first). Wiki-links only in v1 (T-4.1, ADR-0020). |
 | Hover preview | Future | Preview a linked note on hover. |
 | Embedded notes / transclusion | Future | Inline another note's content. |
 | Graph view | Future | Visualize links between notes. |

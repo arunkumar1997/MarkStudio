@@ -27,6 +27,7 @@ The foundational ADRs below (0001–0006) encode the non-negotiable rules from [
 | [0017](#adr-0017-callouts-as-a-dependency-free-markdown-it-core-rule) | Callouts as a dependency-free markdown-it core rule | Accepted |
 | [0018](#adr-0018-wiki-links-as-a-dependency-free-markdown-it-inline-rule) | Wiki links as a dependency-free markdown-it inline rule | Accepted |
 | [0019](#adr-0019-footnotes--gfm-completeness-plugin-for-footnotes-built-ins--an-in-tree-rule-for-the-rest) | Footnotes & GFM completeness: plugin for footnotes, built-ins + an in-tree rule for the rest | Accepted |
+| [0020](#adr-0020-host-side-link-index-with-a-case-insensitive-basename-resolver-behind-a-filesystemwatcher) | Host-side link index with a case-insensitive basename resolver behind a `FileSystemWatcher` | Accepted |
 
 ---
 
@@ -914,3 +915,63 @@ No rule bent. Upholds ADR-0002 (preview patched, never rebuilt, on the hot path)
 * [design/gfm.md](design/gfm.md)
 * [ROADMAP.md](ROADMAP.md) — Phase 3 M3.5
 * [TODO.md](TODO.md) — T-3.5
+
+---
+
+## ADR-0020: Host-side link index with a case-insensitive basename resolver behind a `FileSystemWatcher`
+
+### Status
+`Accepted`
+
+### Date
+2026-06-27
+
+### Context
+**T-4.1** (Phase 4 milestone M4.1) is the **Backlinks panel**: for the active MarkStudio note, show every other workspace note that links to it via a wiki-link (`[[note]]`), and open the source at the linking line on click. This is the first Phase 4 (Knowledge Management) feature, and it also lands the **wiki-link resolver** ADR-0018 explicitly deferred from Phase 3 — the shared PKM primitive that maps a `[[target]]` to a workspace file.
+
+Three project-specific questions had to be settled: (1) the **surface** — a native VS Code view or in-webview UI; (2) the **resolution rule** — how `[[target]]` maps to a file; and (3) **change detection** — how the index stays live, given that ADR-0009 deliberately did *not* add a `FileSystemWatcher` for the editor.
+
+A backlinks view is a workspace-wide, "what links here" surface. Like the document outline (ADR-0014), VS Code ships no native equivalent that works for a custom editor: there is no symbol/reference provider that surfaces for a focused custom editor, and the data is cross-file rather than per-document. The index must also see **every** `.md` file in the workspace — including notes no editor has open — so it cannot be derived from open `TextDocument`s alone.
+
+### Decision
+1. **A host-side `vscode.TreeDataProvider`, mirroring the Outline (ADR-0014).** `BacklinksTreeProvider` backs a dedicated `markstudio.backlinks` tree view (Explorer container, visible only when `activeCustomEditorId == 'markstudio.editor'`), follows the active editor through `MarkStudioEditorProvider.onDidChangeActiveDocument`, and lists one node per source note + linking line. No webview/protocol change — entirely host-side, like the Outline. Clicking a node runs the internal `markstudio.backlinks.open` command, which opens the source in a plain text editor (`showTextDocument` honours `selection`; the custom editor is `priority: "option"`, so it does not hijack the navigation) and reveals the linking line.
+2. **Two pure modules + one I/O service** (`src/links/`, mirroring `src/outline/`). `parseWikiTargets.ts` extracts `[{ target, heading, line }]` from note text using the **same** T-3.4 syntax rules as the preview's inline rule (ADR-0018): a link closes on its own line and may not contain a nested `[`/`]`, and fenced code blocks, YAML front matter, and inline code spans are skipped so documentation *of* the syntax does not pollute the index. `linkIndex.ts` (`buildLinkIndex`) is the pure reverse-index + **resolver**. Both import nothing from `vscode`/the DOM, so they are unit-testable without booting VS Code. `LinkIndexService.ts` owns the I/O the pure modules avoid.
+3. **Case-insensitive basename resolution; path-qualified targets resolve relative first** (Producer decision). `[[Guide]]` matches `Guide.md` anywhere in the workspace; a path-qualified `[[docs/Guide]]` resolves relative to the source note's directory first and falls back to basename only when no such file exists; an ambiguous basename links **all** matching notes (no error); a note never backlinks itself. A `#heading` is captured but resolved to the file this sprint (file-level grouping). The snippet shown in the tree is the trimmed source line containing the link.
+4. **A workspace `FileSystemWatcher` on `**/*.md` is warranted here, in deliberate contrast to ADR-0009.** The initial index is an **async**, batched scan (`workspace.findFiles` with default excludes + bounded-concurrency `fs.readFile`s) kicked off but **not awaited** on the activation path, so activation and the UI are never blocked (ROADMAP Phase 4 exit criterion). The watcher keeps the index live on create/change/delete; updates are **debounced** (250 ms) and **incremental** — only the touched file is re-parsed before the cheap reverse-index rebuild — and the service fires `onDidChangeIndex`, which refreshes the view.
+
+### Alternatives Considered
+1. **An in-webview backlinks pane** — Rejected for the same reasons as the outline (ADR-0014): it duplicates UI a native tree view gives for free (theming, keyboard nav, the Explorer look), adds a pane + state to the App Shell, and conflicts with "less UI is better / native beats custom." A native `TreeView` reads as first-party.
+2. **No watcher — reconcile from open documents only (the ADR-0009 stance)** — Rejected: ADR-0009's reasoning is specific to the **text-backed editor**, where VS Code already manages the open `TextDocument` and fires `onDidChangeTextDocument`, so a watcher would be a redundant, double-firing second source for files VS Code already syncs. The backlinks index is the opposite case: it must index files **no editor has open**, for which `onDidChangeTextDocument` never fires. The workspace `FileSystemWatcher` is the supported, native API for exactly this breadth (and the one ADR-0004 names) — so this is not bending ADR-0009 but applying ADR-0004's "use `createFileSystemWatcher`" clause to the workspace-indexing case ADR-0009 was never about.
+3. **A synchronous workspace walk at activation** — Rejected outright: it would block activation and violate the Phase 4 exit criterion ("link indexing scales to a large workspace without blocking the UI"). The scan is async and batched, and the view shows an "Indexing…" message until the first scan completes.
+4. **Full re-scan on every file change** — Rejected: re-reading the whole workspace on each keystroke-save does not scale. The service caches parsed notes per path and re-parses only the changed file, then rebuilds the (cheap) reverse index from cache; bursts are coalesced by the debounce.
+5. **Markdown-link (`[text](note.md)`) backlinks in v1** — Rejected by the Producer for this sprint: wiki-links only, to keep the resolver focused; Markdown-link indexing is a tracked follow-up.
+6. **Resolve `#heading` to a heading-level backlink** — Deferred: the heading is captured in the index but grouped at the file level this sprint; heading-level backlinks are a later M4.x refinement.
+
+### Reasoning
+Mirroring the Outline (ADR-0014) reuses a proven, native, host-side pattern and keeps the webview/protocol untouched. Keeping `parseWikiTargets` and `linkIndex` pure isolates the two genuinely testable pieces (syntax extraction + resolution) behind a unit-testable boundary, exactly as `headings.ts` is for the outline — the resolver's rules (basename, relative-first, ambiguity, no self-link) are pinned by unit tests without a VS Code host. The basename rule matches how note-taking tools (and the deferred ADR-0018 intent) resolve `[[wiki]]` references — by name, not path — while relative-first resolution disambiguates the path-qualified case. The `FileSystemWatcher` is the right tool *here* precisely because the data is workspace-wide rather than tied to a single managed document, which is the distinction ADR-0009 turned on.
+
+### Consequences
+**Positive:** A native, first-party-feeling backlinks panel that follows the active note and stays live as files change, with no webview recreation and no protocol change. The wiki-link resolver deferred from Phase 3 now exists as a pure, tested module reusable by later PKM features (hover preview M4.2, graph view M4.4). Initial indexing is async and non-blocking. Host bundle grows from **~25.4 KB to ~40.4 KB** (+~15.0 KB for the `src/links/` module); the webview is untouched.
+**Negative / Trade-offs:** The index holds parsed links for every workspace `.md` file in memory (small — targets + line numbers + a snippet string per link), so a very large vault uses proportional memory. Path identity is the workspace-relative POSIX path, so two folders with an identically-named file in a multi-root workspace could collide on resolution (acceptable for v1; single-root is the common case). Markdown-link backlinks and heading-level grouping are out of scope. The view follows only the **active** MarkStudio editor (consistent with the rest of the extension).
+**Neutral:** A new `src/links/` module (`parseWikiTargets.ts`, `linkIndex.ts`, `LinkIndexService.ts`, `BacklinksTreeProvider.ts`, `registerBacklinks.ts`), one new view contribution (`markstudio.backlinks`), and one internal command (`markstudio.backlinks.open`, not contributed to the palette). No new dependency, no new setting (the panel mirrors the Outline's active-doc scoping).
+
+### Compliance Impact
+No rule bent. Upholds ADR-0001 (reads workspace files / the managed document via supported APIs), ADR-0002 (the webview is never recreated; navigation opens a native text editor, no `postMessage`), ADR-0004 (change detection via `createFileSystemWatcher` — the very API ADR-0004 names — and native tree-view theming), ADR-0005 (no framework; vanilla host code + two pure modules), and ADR-0014's host-side-tree-view precedent. It **applies** ADR-0009's reasoning rather than contradicting it: a watcher is correct for workspace-wide indexing, wrong for the single text-backed document.
+
+### Migration Plan
+Not a migration. New files under `src/links/`; `src/extension.ts` calls `registerBacklinks(provider)` alongside `registerOutline(provider)`; `package.json` contributes the `markstudio.backlinks` view. No existing behaviour changes; no message-protocol change.
+
+### Follow-Ups
+* Markdown-link (`[text](note.md)`) backlinks — a second extractor feeding the same index.
+* In-preview wiki-link navigation — resolve + open `[[target]]` clicked **inside** the preview (reuses this resolver).
+* Heading-level backlinks — group/resolve `#heading` rather than only capturing it.
+* Multi-root path-collision disambiguation if it proves to matter in practice.
+
+### References
+* [ADR-0004](#adr-0004-rely-on-vs-code-for-theming-autosave-and-file-watching)
+* [ADR-0009](#adr-0009-reconcile-external-changes-through-the-managed-textdocument-with-a-cursor-preserving-diff)
+* [ADR-0014](#adr-0014-document-outline-as-a-host-side-treedataprovider)
+* [ADR-0018](#adr-0018-wiki-links-as-a-dependency-free-markdown-it-inline-rule)
+* [design/backlinks.md](design/backlinks.md)
+* [ROADMAP.md](ROADMAP.md) — Phase 4 M4.1
+* [TODO.md](TODO.md) — T-4.1
