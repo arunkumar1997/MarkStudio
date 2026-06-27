@@ -22,7 +22,8 @@ const CONFIG: MarkStudioConfig = {
   wordWrap: true,
   math: true,
   mermaid: true,
-  callouts: true
+  callouts: true,
+  wikiLinks: true
 };
 
 describe("createEditor — host/local edit seam", () => {

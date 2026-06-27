@@ -74,7 +74,7 @@ The syntax extensions that make Markdown feel modern. Each attaches as a CodeMir
 * M3.1 — Math rendering (inline and block) *(Done — T-3.1, ADR-0015)*
 * M3.2 — Mermaid diagrams *(Done — T-3.2, ADR-0016)*
 * M3.3 — Callouts / admonitions *(Done — T-3.3, ADR-0017)*
-* M3.4 — Wiki-style links (`[[...]]`)
+* M3.4 — Wiki-style links (`[[...]]`) *(Done — T-3.4, ADR-0018)*
 * M3.5 — Footnotes and GFM completeness (tables, task lists, strikethrough)
 
 **Exit criteria**

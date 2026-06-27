@@ -134,6 +134,12 @@
           "default": true,
           "scope": "resource",
           "description": "Render callout / admonition blockquotes (e.g. > [!NOTE], > [!WARNING], > [!TIP]) as styled boxes in the MarkStudio preview."
+        },
+        "markstudio.preview.wikiLinks": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "description": "Render wiki-style links (e.g. [[note]], [[note|alias]], [[note#heading]]) as links in the MarkStudio preview."
         }
       }
     },

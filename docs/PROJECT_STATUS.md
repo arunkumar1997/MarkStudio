@@ -7,19 +7,19 @@
 ## 1. Snapshot
 
 * **Current phase:** **Phase 3 — Modern Markdown is in progress.** Phase 0, Phase 1 — Editing Core, and Phase 2 — Editing Quality are complete.
-* **Current milestone:** **T-3.3 — Callouts / admonitions (M3.3) Done.** GitHub-style callout blockquotes (`> [!NOTE]`, `> [!TIP]`, `> [!IMPORTANT]`, `> [!WARNING]`, `> [!CAUTION]`) now render as themed boxes with a Codicon icon + title in the preview, gated behind a new `markstudio.preview.callouts` setting (default on) and degrading to an ordinary blockquote when off (ADR-0017). Implemented with **no new dependency** as a small markdown-it **core rule** (`src/webview/preview/callouts.ts`) that post-processes the token stream: a `blockquote_open` whose first paragraph starts with a known `[!TYPE]` marker is rewritten to a `<div class="markstudio-callout …">`, an `html_block` title is injected, and the marker line is stripped. Themed entirely via `--vscode-*` variables. **No new dependency, one new setting, no new message type, no webview structural change.**
-* **Overall completion (qualitative):** Phase 0: 100%. Phase 1: 100%. Phase 2: 100%. **Phase 3: ~60%** (M3.1 math + M3.2 mermaid + M3.3 callouts done; M3.4 wiki links, M3.5 footnotes/GFM remaining).
-* **Last updated:** 2026-06-27 by the T-3.3 session
+* **Current milestone:** **T-3.4 — Wiki-style links (M3.4) Done.** Wiki-style links (`[[note]]`, `[[note|alias]]`, `[[note#heading]]`) now render as styled links in the preview, gated behind a new `markstudio.preview.wikiLinks` setting (default on) and degrading to literal `[[…]]` text when off (ADR-0018). Implemented with **no new dependency** as a small markdown-it **inline rule** (`src/webview/preview/wikiLinks.ts`) registered before the built-in `link` rule: a `[[` opener is claimed before the ordinary `[link](url)` parser, parsed into target / alias / heading, and emitted as an `<a class="markstudio-wikilink">` carrying `data-wikilink-target` / `data-wikilink-heading`. Themed entirely via `--vscode-*` variables; resolution to real files is deferred to Phase 4. **No new dependency, one new setting, no new message type, no webview structural change.**
+* **Overall completion (qualitative):** Phase 0: 100%. Phase 1: 100%. Phase 2: 100%. **Phase 3: ~80%** (M3.1 math + M3.2 mermaid + M3.3 callouts + M3.4 wiki links done; M3.5 footnotes/GFM remaining).
+* **Last updated:** 2026-06-27 by the T-3.4 session
 * **Last commit on `main`:** *(repository is under git; changes from this session are uncommitted)*
 
 ---
 
 ## 2. Current Focus
 
-* **Active initiative:** **Phase 3 — Modern Markdown.** T-3.3 (Callouts) attaches as a dependency-free markdown-it core rule in `src/webview/preview/callouts.ts`, applied from `PreviewRenderer.createMarkdownIt`, behind the `MarkStudioConfig.callouts` flag and the existing `configChanged` seam (T-111). **No new dependency, one new setting, no new esbuild target, no new message type, no webview structural change.**
-* **Owner (current agent):** T-3.3 session
+* **Active initiative:** **Phase 3 — Modern Markdown.** T-3.4 (Wiki-style links) attaches as a dependency-free markdown-it inline rule in `src/webview/preview/wikiLinks.ts`, applied from `PreviewRenderer.createMarkdownIt`, behind the `MarkStudioConfig.wikiLinks` flag and the existing `configChanged` seam (T-111). **No new dependency, one new setting, no new esbuild target, no new message type, no webview structural change.**
+* **Owner (current agent):** T-3.4 session
 * **Started:** 2026-06-27
-* **Target outcome:** M3.3 is met. The next milestone is **M3.4 — Wiki-style links (`[[…]]`)** ([ROADMAP.md](ROADMAP.md)) — see [TODO.md](TODO.md) and [AGENT_HANDOFF.md](AGENT_HANDOFF.md) §10.
+* **Target outcome:** M3.4 is met. The next milestone is **M3.5 — Footnotes & GFM completeness** ([ROADMAP.md](ROADMAP.md)) — see [TODO.md](TODO.md) and [AGENT_HANDOFF.md](AGENT_HANDOFF.md) §10.
 
 ---
 
@@ -48,6 +48,7 @@ User-visible features that are shipped and stable.
 | **Math rendering (Phase 3 M3.1)** — inline (`$…$`) and block (`$$…$$`) math rendered in the preview with KaTeX via `@vscode/markdown-it-katex`; toggleable through `markstudio.preview.math` (default on) and degrading to literal text when off; KaTeX CSS + fonts shipped locally under the existing CSP (ADR-0015) | 3 | Unreleased (T-3.1) |
 | **Mermaid diagrams (Phase 3 M3.2)** — fenced ```mermaid blocks rendered as diagrams in the preview with Mermaid; toggleable through `markstudio.preview.mermaid` (default on) and degrading to a plain code block when off; the library is **lazy-loaded on first use** from a separate bundle so the base webview is essentially unchanged (ADR-0016) | 3 | Unreleased (T-3.2) |
 | **Callouts / admonitions (Phase 3 M3.3)** — GitHub-style callout blockquotes (`> [!NOTE]`, `> [!TIP]`, `> [!IMPORTANT]`, `> [!WARNING]`, `> [!CAUTION]`) rendered as themed boxes with a Codicon icon + title in the preview via a dependency-free markdown-it core rule; toggleable through `markstudio.preview.callouts` (default on) and degrading to an ordinary blockquote when off; themed entirely via `--vscode-*` variables (ADR-0017) | 3 | Unreleased (T-3.3) |
+| **Wiki-style links (Phase 3 M3.4)** — `[[note]]`, `[[note|alias]]`, and `[[note#heading]]` rendered as styled links in the preview via a dependency-free markdown-it inline rule; toggleable through `markstudio.preview.wikiLinks` (default on) and degrading to literal text when off; themed via `--vscode-*` variables; resolution to real files deferred to Phase 4 (ADR-0018) | 3 | Unreleased (T-3.4) |
 
 For details, see [FEATURES.md](FEATURES.md).
 
@@ -57,7 +58,7 @@ For details, see [FEATURES.md](FEATURES.md).
 
 | Item | State | Owner | Notes |
 | ---- | ----- | ----- | ----- |
-| *(none — T-3.3 closed)* | — | — | Phase 3 M3.3 is complete; the next milestone is M3.4 — Wiki-style links (`[[…]]`) |
+| *(none — T-3.4 closed)* | — | — | Phase 3 M3.4 is complete; the next milestone is M3.5 — Footnotes & GFM completeness |
 
 ---
 
@@ -99,9 +100,9 @@ For details, see [FEATURES.md](FEATURES.md).
 
 ## 8. Health Checks
 
-* [x] Build is green — `npm run build` produces `dist/extension.js`, `dist/webview.js`, the separate `dist/mermaid.js`, the Codicons assets, and the KaTeX assets; production-minified webview is **~977.7 KB** (+~3.4 KB over T-3.2 for the callouts rule + CSS; Mermaid lives in its own **~3.3 MB** lazy bundle), host bundle **~12.1 KB** (≈ unchanged)
+* [x] Build is green — `npm run build` produces `dist/extension.js`, `dist/webview.js`, the separate `dist/mermaid.js`, the Codicons assets, and the KaTeX assets; the wiki-link inline rule + CSS add only a few KB over T-3.3 (Mermaid lives in its own lazy bundle), host bundle ≈ unchanged
 * [x] Typecheck is green — `npm run typecheck` (strict) **and** `npm run typecheck:test` (strict, incl. tests) pass
-* [x] Tests are green — `npm test` runs **103 tests** (83 unit + 20 integration, `node:test`); the Extension Host lifecycle layer (`npm run test:exthost`, 4 tests) runs separately. CI runs all three layers on push/PR
+* [x] Tests are green — `npm test` runs **111 tests** (85 unit + 26 integration, `node:test`); the Extension Host lifecycle layer (`npm run test:exthost`, 4 tests) runs separately. CI runs all three layers on push/PR
 * [x] Lint is green — `npm run lint` (ESLint `--max-warnings 0` + `prettier --check .`) clean
 * [x] No unresolved high-severity issues
 * [x] Documentation is current with the codebase
@@ -112,24 +113,24 @@ For details, see [FEATURES.md](FEATURES.md).
 
 ## 9. Recently Completed (Last Session)
 
-* Implemented **T-3.3 — Callouts / admonitions** (Phase 3 milestone M3.3):
-  * `src/webview/preview/callouts.ts` (new) — `applyCallouts(md)` registers a markdown-it **core rule** that post-processes the token stream: it finds a `blockquote_open` whose first paragraph's first line matches a known `[!TYPE]` marker, rewrites the `blockquote_open`/`blockquote_close` tags to `div` with `class="markstudio-callout markstudio-callout-<type>"`, injects an `html_block` title token (Codicon icon + escaped label/custom title), and strips the marker line (re-parsing the remaining inline body, or dropping the marker-only paragraph). A type table maps NOTE/TIP/IMPORTANT/WARNING/CAUTION to a label + Codicon. **No `import` of any new package.**
-  * `src/webview/preview/PreviewRenderer.ts` — `createMarkdownIt(math, mermaid, callouts)` applies the rule when on; `setConfig` rebuilds when `math`, `mermaid` **or** `callouts` flips.
-  * `src/messaging/messages.ts` — `MarkStudioConfig` gained `callouts: boolean`; `isMarkStudioConfig` validates it.
-  * `src/services/ConfigurationService.ts` — `read` resolves `preview.callouts` (default `true`).
-  * `src/webview/main.ts` — themed `.markstudio-callout` / `.markstudio-callout-title` styling driven entirely by `--vscode-*` variables, with a per-type `--markstudio-callout-accent`.
-  * `package.json` — contributes `markstudio.preview.callouts` (boolean, default `true`, `resource` scope). No dependency added.
-  * Tests: 5 new integration tests in `test/integration/previewRenderer.test.ts` (styled markup when on, custom title, plain-blockquote fallback when off, ordinary blockquote untouched, live `setConfig` toggle) + 2 new `ConfigurationService` cases; config fixtures updated for the `callouts` field across all four test files. Unit 81 → 83, integration 15 → 20.
-  * Documentation pass: [design/callouts.md](design/callouts.md) (new), **ADR-0017** in [DECISIONS.md](DECISIONS.md), [api/message-protocol.md](api/message-protocol.md), [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md), [ROADMAP.md](ROADMAP.md) (M3.3 → Done), [TODO.md](TODO.md) (T-3.3 → Done), this file, and [AGENT_HANDOFF.md](AGENT_HANDOFF.md).
-  * **Decision (ADR-0017):** Implement callouts as a dependency-free markdown-it core rule rather than pulling an npm callout plugin — the transform is ~80 lines and fully under our control, consistent with the dependency-policy ADRs.
-  * **No new dependency**, one new setting, no new esbuild target, no new message type, no webview structural change. `npm run lint`, `npm run typecheck`, `npm run typecheck:test`, `npm run build`, and `npm test` (83 unit + 20 integration) are all green locally.
+* Implemented **T-3.4 — Wiki-style links** (Phase 3 milestone M3.4):
+  * `src/webview/preview/wikiLinks.ts` (new) — `applyWikiLinks(md)` registers a markdown-it **inline rule** before the built-in `link` rule: a `[[` opener is claimed before the ordinary `[link](url)` parser, scanned to its `]]`, rejected if it contains a newline or nested `[`/`]`, then parsed into target / alias / heading and pushed as a `wikilink_open` (`a`) token carrying `class="markstudio-wikilink"`, `data-wikilink-target`, an optional `data-wikilink-heading`, and a `title` tooltip, a `text` token for the label, and a `wikilink_close`. **No `import` of any new package.**
+  * `src/webview/preview/PreviewRenderer.ts` — `createMarkdownIt(math, mermaid, callouts, wikiLinks)` applies the rule when on; `setConfig` rebuilds when any preview flag flips.
+  * `src/messaging/messages.ts` — `MarkStudioConfig` gained `wikiLinks: boolean`; `isMarkStudioConfig` validates it.
+  * `src/services/ConfigurationService.ts` — `read` resolves `preview.wikiLinks` (default `true`).
+  * `src/webview/main.ts` — themed `.markstudio-wikilink` styling driven entirely by `--vscode-*` variables (link colour + dashed underline, solid on hover).
+  * `package.json` — contributes `markstudio.preview.wikiLinks` (boolean, default `true`, `resource` scope). No dependency added.
+  * Tests: 6 new integration tests in `test/integration/previewRenderer.test.ts` (styled link with target when on, alias display text, captured heading, literal-text fallback when off, ordinary `[link](url)` untouched, live `setConfig` toggle) + 2 new `ConfigurationService` cases; config fixtures updated for the `wikiLinks` field across all four config-bearing test files. Unit 83 → 85, integration 20 → 26.
+  * Documentation pass: [design/wiki-links.md](design/wiki-links.md) (new), **ADR-0018** in [DECISIONS.md](DECISIONS.md) (and the previously missing ADR-0017 index row was added), [api/message-protocol.md](api/message-protocol.md), [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md), [ROADMAP.md](ROADMAP.md) (M3.4 → Done), [TODO.md](TODO.md) (T-3.4 → Done), this file, and [AGENT_HANDOFF.md](AGENT_HANDOFF.md).
+  * **Decision (ADR-0018):** Implement wiki links as a dependency-free markdown-it inline rule rather than pulling an npm plugin — the rule is ~60 lines and fully under our control, and resolution to real files is deferred to Phase 4.
+  * **No new dependency**, one new setting, no new esbuild target, no new message type, no webview structural change. `npm run lint`, `npm run typecheck`, `npm run typecheck:test`, `npm run build`, and `npm test` (85 unit + 26 integration) are all green locally.
 
 ---
 
 ## 10. Recommended Next Task
 
-* **Task:** Continue **Phase 3 — Modern Markdown** ([ROADMAP.md](ROADMAP.md)) with **M3.4 — Wiki-style links (`[[…]]`)** (T-3.4). Parse `[[note]]` links in the preview (resolution to actual files comes later in Phase 4), behind a `markstudio.preview.wikiLinks` setting (default on), reusing the `MarkStudioConfig` + `configChanged` seam (T-111) and the `PreviewRenderer.setConfig` rebuild pattern (T-3.1 / T-3.2 / T-3.3).
-* **Why:** M3.1 (math), M3.2 (mermaid), and M3.3 (callouts) are complete; M3.4 is the next sequenced Phase 3 milestone. Like callouts, it is markdown-it-only with no large dependency.
+* **Task:** Continue **Phase 3 — Modern Markdown** ([ROADMAP.md](ROADMAP.md)) with **M3.5 — Footnotes & GFM completeness** (T-3.5). Add footnotes, task lists, tables, and strikethrough via markdown-it plugins, each individually toggleable, reusing the `MarkStudioConfig` + `configChanged` seam (T-111) and the `PreviewRenderer.setConfig` rebuild pattern (T-3.1 / T-3.2 / T-3.3 / T-3.4).
+* **Why:** M3.1–M3.4 are complete; M3.5 is the final Phase 3 milestone.
 * **Suggested prompt:** [.ai/PROMPTS/feature.md](../.ai/PROMPTS/feature.md).
 
 ---

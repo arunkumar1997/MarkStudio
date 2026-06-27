@@ -23,7 +23,8 @@ const CONFIG: MarkStudioConfig = {
   wordWrap: true,
   math: true,
   mermaid: true,
-  callouts: true
+  callouts: true,
+  wikiLinks: true
 };
 
 // The renderer debounces updates by 40 ms; wait past that to read the result.
@@ -382,5 +383,110 @@ describe("createPreviewRenderer — callout rendering (T-3.3)", () => {
       root().querySelector(".markstudio-callout-tip"),
       "toggling callouts on should swap the blockquote for a callout box"
     );
+  });
+});
+
+describe("createPreviewRenderer — wiki-link rendering (T-3.4)", () => {
+  let container: HTMLElement;
+  let renderer: PreviewRenderer | null;
+
+  beforeEach(() => {
+    container = createContainer();
+    renderer = null;
+  });
+
+  afterEach(() => {
+    renderer?.destroy();
+    removeContainer(container);
+  });
+
+  function root(): HTMLElement {
+    const el = container.querySelector(".markstudio-preview-content");
+    assert.ok(el, "preview root should exist");
+    return el as HTMLElement;
+  }
+
+  it("renders a [[note]] as a styled wiki link carrying its target", async () => {
+    renderer = createPreviewRenderer(container, CONFIG);
+    renderer.update("See [[My Note]] for details.");
+    await flush();
+
+    const link = root().querySelector("a.markstudio-wikilink");
+    assert.ok(link, "a wiki-link anchor should be emitted when on");
+    assert.equal(link?.textContent, "My Note");
+    assert.equal(link?.getAttribute("data-wikilink-target"), "My Note");
+    assert.equal(
+      link?.getAttribute("data-wikilink-heading"),
+      null,
+      "no heading attribute when none is given"
+    );
+  });
+
+  it("uses the alias for the display text in [[target|alias]]", async () => {
+    renderer = createPreviewRenderer(container, CONFIG);
+    renderer.update("Jump to [[home|the home page]].");
+    await flush();
+
+    const link = root().querySelector("a.markstudio-wikilink");
+    assert.equal(link?.textContent, "the home page");
+    assert.equal(link?.getAttribute("data-wikilink-target"), "home");
+  });
+
+  it("captures the heading anchor in [[note#heading]]", async () => {
+    renderer = createPreviewRenderer(container, CONFIG);
+    renderer.update("See [[Guide#Setup]].");
+    await flush();
+
+    const link = root().querySelector("a.markstudio-wikilink");
+    assert.equal(link?.getAttribute("data-wikilink-target"), "Guide");
+    assert.equal(link?.getAttribute("data-wikilink-heading"), "Setup");
+    assert.equal(link?.textContent, "Guide#Setup");
+  });
+
+  it("leaves [[note]] as literal text when wiki links are disabled", async () => {
+    renderer = createPreviewRenderer(container, {
+      ...CONFIG,
+      wikiLinks: false
+    });
+    renderer.update("See [[My Note]].");
+    await flush();
+
+    assert.equal(
+      root().querySelector("a.markstudio-wikilink"),
+      null,
+      "no wiki-link anchor should render when wiki links are off"
+    );
+    assert.match(root().textContent ?? "", /\[\[My Note\]\]/);
+  });
+
+  it("toggles a [[note]] to a wiki link live via setConfig", async () => {
+    renderer = createPreviewRenderer(container, {
+      ...CONFIG,
+      wikiLinks: false
+    });
+    renderer.update("See [[My Note]].");
+    await flush();
+    assert.equal(root().querySelector("a.markstudio-wikilink"), null);
+
+    renderer.setConfig({ ...CONFIG, wikiLinks: true });
+    await flush();
+    assert.ok(
+      root().querySelector("a.markstudio-wikilink"),
+      "toggling wiki links on should render the [[…]] as a link"
+    );
+  });
+
+  it("does not treat an ordinary [link](url) as a wiki link", async () => {
+    renderer = createPreviewRenderer(container, CONFIG);
+    renderer.update("An [ordinary](https://example.com) link.");
+    await flush();
+
+    assert.equal(
+      root().querySelector("a.markstudio-wikilink"),
+      null,
+      "a normal markdown link should not become a wiki link"
+    );
+    const link = root().querySelector("a");
+    assert.equal(link?.getAttribute("href"), "https://example.com");
   });
 });

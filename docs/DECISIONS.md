@@ -24,6 +24,8 @@ The foundational ADRs below (0001–0006) encode the non-negotiable rules from [
 | [0014](#adr-0014-document-outline-as-a-host-side-treedataprovider) | Document outline as a host-side `TreeDataProvider` | Accepted |
 | [0015](#adr-0015-katex-for-math-rendering-in-the-preview) | KaTeX for math rendering in the preview | Accepted |
 | [0016](#adr-0016-lazy-loaded-mermaid-for-diagram-rendering-in-the-preview) | Lazy-loaded Mermaid for diagram rendering in the preview | Accepted |
+| [0017](#adr-0017-callouts-as-a-dependency-free-markdown-it-core-rule) | Callouts as a dependency-free markdown-it core rule | Accepted |
+| [0018](#adr-0018-wiki-links-as-a-dependency-free-markdown-it-inline-rule) | Wiki links as a dependency-free markdown-it inline rule | Accepted |
 
 ---
 
@@ -821,3 +823,46 @@ No rule bent. Upholds ADR-0002 (preview patched, never rebuilt, on the hot path)
 * [design/callouts.md](design/callouts.md)
 * [ROADMAP.md](ROADMAP.md) — Phase 3 M3.3
 * [TODO.md](TODO.md) — T-3.3
+
+---
+
+## ADR-0018: Wiki links as a dependency-free markdown-it inline rule
+
+### Status
+`Accepted`
+
+### Date
+2026-06-27
+
+### Context
+**T-3.4** (Phase 3 M3.4) adds wiki-style links — an inline `[[target]]` reference, optionally with an alias (`[[target|alias]]`) and/or a heading anchor (`[[target#heading]]`). They must attach to the existing markdown-it preview, be individually toggleable via `markstudio.preview.wikiLinks`, degrade to literal `[[…]]` text when off, and theme entirely via `--vscode-*` variables. Like callouts (ADR-0017), wiki links are pure markup — no rendering engine is required. Resolution to actual files is deferred to **Phase 4**; v1 styles the link and carries its target/heading as `data-*` attributes.
+
+### Decision
+1. **No new dependency.** The transform is implemented inline as a small markdown-it **inline rule** (`src/webview/preview/wikiLinks.ts`, `applyWikiLinks(md)`), registered only when the setting is on.
+2. **Register before the built-in `link` rule.** `md.inline.ruler.before("link", "markstudio_wikilink", …)` claims a `[[` opener before markdown-it's ordinary `[link](url)` parser sees it. The rule scans to the closing `]]`, rejects anything containing a newline or a nested `[`/`]` (so ordinary link syntax is never swallowed), parses the target / alias / heading, and pushes a `wikilink_open` (`a`) token carrying `class="markstudio-wikilink"`, `data-wikilink-target`, an optional `data-wikilink-heading`, and a `title` tooltip, a `text` token for the display label, and a `wikilink_close`. A single `[` falls straight through to the built-in rule.
+3. **Toggle reuses the config seam (T-111).** `MarkStudioConfig` gains a `wikiLinks` field (validated by `isMarkStudioConfig`); `ConfigurationService.read` resolves `preview.wikiLinks` (default `true`); `package.json` contributes the `resource`-scoped setting. `PreviewRenderer.createMarkdownIt(math, mermaid, callouts, wikiLinks)` applies the rule when on, and `setConfig` rebuilds the instance when any preview flag flips. No new message type.
+4. **Resolution deferred to Phase 4.** The anchor has no `href` and does not navigate yet; it is styled (link colour + dashed underline) and carries its target/heading for a later click handler.
+
+### Alternatives Considered
+1. **An npm wiki-link plugin** (e.g. `markdown-it-wikilinks`) — Rejected: a dependency for ~60 lines of well-scoped logic, against the dependency-policy ADRs, and most plugins hard-code a URL resolver we do not want until Phase 4.
+2. **A core rule post-processing the token stream** (as callouts do) — Rejected: wiki links are *inline*, so an inline rule is the idiomatic, lower-risk seam and never re-tokenises paragraphs.
+3. **Override the default `link` renderer** — Rejected: the link rule never produces a token for `[[…]]`, so there is nothing to override; the opener must be claimed during inline parsing.
+
+### Reasoning
+"Native beats custom" and the lean dependency list (ADR-0005) point straight at an inline rule. Registering before the `link` rule is the idiomatic markdown-it seam for new inline syntax, leaves ordinary links untouched, and is fully exercisable through the existing jsdom integration harness. Carrying the target as `data-*` keeps v1 dependency-free and forward-compatible with the Phase 4 resolver.
+
+### Consequences
+**Positive:** Native-looking wiki links, individually toggleable, that degrade to literal text when off — with **no new dependency** and **no meaningful bundle growth** (+~a few KB for the rule + CSS). No new message type, no CSP change.
+**Negative / Trade-offs:** The links do not yet navigate (Phase 4). The syntax (target / `#heading` / `|alias`) is fixed in the rule (extending it is a code change). The visual theming cannot be asserted under jsdom, so it stays in the manual EDH matrix — the integration tests cover the markdown-it seam (styled anchor with target when on, alias display, captured heading, literal-text fallback when off, ordinary `[link](url)` untouched, live toggle).
+**Neutral:** A new `markstudio.preview.wikiLinks` setting; the `wikiLinks` field on `MarkStudioConfig`; a new `src/webview/preview/wikiLinks.ts` module.
+
+### Compliance Impact
+No rule bent. Upholds ADR-0002 (preview patched, never rebuilt, on the hot path), ADR-0003/0008 (markdown-it seam for preview rendering), ADR-0004 (strict CSP, `--vscode-*` theming), and ADR-0005 (no UI framework, no new dependency).
+
+### References
+* [ADR-0008](#adr-0008-markdown-it-package-and-incremental-block-level-preview-patching)
+* [ADR-0010](#adr-0010-reactive-configuration-service-with-cm6-compartments-for-live-settings)
+* [ADR-0017](#adr-0017-callouts-as-a-dependency-free-markdown-it-core-rule)
+* [design/wiki-links.md](design/wiki-links.md)
+* [ROADMAP.md](ROADMAP.md) — Phase 3 M3.4
+* [TODO.md](TODO.md) — T-3.4

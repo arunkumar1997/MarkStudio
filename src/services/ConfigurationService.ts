@@ -22,7 +22,8 @@ export class ConfigurationService {
       wordWrap: config.get<boolean>("editor.wordWrap", true),
       math: config.get<boolean>("preview.math", true),
       mermaid: config.get<boolean>("preview.mermaid", true),
-      callouts: config.get<boolean>("preview.callouts", true)
+      callouts: config.get<boolean>("preview.callouts", true),
+      wikiLinks: config.get<boolean>("preview.wikiLinks", true)
     };
   }
 

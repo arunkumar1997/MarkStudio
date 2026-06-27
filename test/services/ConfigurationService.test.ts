@@ -28,7 +28,8 @@ describe("ConfigurationService.read", () => {
       wordWrap: true,
       math: true,
       mermaid: true,
-      callouts: true
+      callouts: true,
+      wikiLinks: true
     });
   });
 
@@ -40,7 +41,8 @@ describe("ConfigurationService.read", () => {
       wordWrap: true,
       math: true,
       mermaid: true,
-      callouts: true
+      callouts: true,
+      wikiLinks: true
     });
   });
 
@@ -57,7 +59,8 @@ describe("ConfigurationService.read", () => {
       wordWrap: false,
       math: true,
       mermaid: true,
-      callouts: true
+      callouts: true,
+      wikiLinks: true
     });
   });
 
@@ -74,7 +77,8 @@ describe("ConfigurationService.read", () => {
       wordWrap: true,
       math: false,
       mermaid: true,
-      callouts: true
+      callouts: true,
+      wikiLinks: true
     });
   });
 
@@ -91,7 +95,8 @@ describe("ConfigurationService.read", () => {
       wordWrap: true,
       math: true,
       mermaid: false,
-      callouts: true
+      callouts: true,
+      wikiLinks: true
     });
   });
 
@@ -108,7 +113,26 @@ describe("ConfigurationService.read", () => {
       wordWrap: true,
       math: true,
       mermaid: true,
-      callouts: false
+      callouts: false,
+      wikiLinks: true
+    });
+  });
+
+  it("defaults wikiLinks to true when unset", () => {
+    const service = new ConfigurationService();
+    assert.equal(service.read().wikiLinks, true);
+  });
+
+  it("honours an explicit wikiLinks override", () => {
+    __setConfigValues({ "preview.wikiLinks": false });
+    const service = new ConfigurationService();
+    assert.deepEqual(service.read(), {
+      lineNumbers: true,
+      wordWrap: true,
+      math: true,
+      mermaid: true,
+      callouts: true,
+      wikiLinks: false
     });
   });
 });

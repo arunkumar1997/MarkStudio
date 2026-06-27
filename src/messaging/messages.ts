@@ -40,6 +40,10 @@ export interface MarkStudioConfig {
   // themed callout boxes in the preview (T-3.3, M3.3). When off the block is
   // shown as an ordinary blockquote so rendering never breaks.
   readonly callouts: boolean;
+  // `markstudio.preview.wikiLinks` — render `[[note]]`-style wiki links in the
+  // preview (T-3.4, M3.4). When off the `[[…]]` is left as literal text so
+  // rendering never breaks. Resolution to real files is deferred to Phase 4.
+  readonly wikiLinks: boolean;
 }
 
 // First content load. Sent once the webview signals `ready`.
@@ -205,7 +209,8 @@ function isMarkStudioConfig(value: unknown): value is MarkStudioConfig {
     typeof value.wordWrap === "boolean" &&
     typeof value.math === "boolean" &&
     typeof value.mermaid === "boolean" &&
-    typeof value.callouts === "boolean"
+    typeof value.callouts === "boolean" &&
+    typeof value.wikiLinks === "boolean"
   );
 }
 

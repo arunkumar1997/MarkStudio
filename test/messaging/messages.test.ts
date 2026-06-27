@@ -19,7 +19,8 @@ const VALID_CONFIG = {
   wordWrap: true,
   math: true,
   mermaid: true,
-  callouts: true
+  callouts: true,
+  wikiLinks: true
 };
 
 describe("isHostToWebviewMessage", () => {

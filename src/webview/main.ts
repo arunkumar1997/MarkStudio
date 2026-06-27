@@ -339,6 +339,20 @@ function injectBaseStyles(): void {
     .markstudio-callout-caution {
       --markstudio-callout-accent: var(--vscode-editorError-foreground, var(--vscode-charts-red, var(--vscode-errorForeground)));
     }
+    /* Wiki-style links (T-3.4). Styled as a link via --vscode-* variables; a
+       dashed underline distinguishes an unresolved wiki link from an ordinary
+       resolved link. Resolution to real files arrives in Phase 4. */
+    .markstudio-wikilink {
+      color: var(--vscode-textLink-foreground);
+      text-decoration: underline;
+      text-decoration-style: dashed;
+      text-underline-offset: 0.2em;
+      cursor: pointer;
+    }
+    .markstudio-wikilink:hover {
+      color: var(--vscode-textLink-activeForeground, var(--vscode-textLink-foreground));
+      text-decoration-style: solid;
+    }
   `;
   document.head.append(style);
 }

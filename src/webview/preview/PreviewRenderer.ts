@@ -19,6 +19,7 @@ import markdownItKatex from "@vscode/markdown-it-katex";
 import type { MarkStudioConfig } from "../../messaging/messages";
 import { MERMAID_BLOCK_CLASS, renderMermaidBlocks } from "./mermaid";
 import { applyCallouts } from "./callouts";
+import { applyWikiLinks } from "./wikiLinks";
 
 type Token = ReturnType<MarkdownIt["parse"]>[number];
 
@@ -41,11 +42,11 @@ export interface PreviewBlock {
 
 export interface PreviewRenderer {
   update(text: string): void;
-  // Re-read the resolved settings (T-3.1, T-3.2, T-3.3). The `math`, `mermaid`
-  // and `callouts` flags change how markdown-it tokenises/renders, so toggling
-  // any of them rebuilds the instance and re-renders the last text — applied
-  // live without a reload. Other settings that do not affect the preview are
-  // ignored.
+  // Re-read the resolved settings (T-3.1, T-3.2, T-3.3, T-3.4). The `math`,
+  // `mermaid`, `callouts` and `wikiLinks` flags change how markdown-it
+  // tokenises/renders, so toggling any of them rebuilds the instance and
+  // re-renders the last text — applied live without a reload. Other settings
+  // that do not affect the preview are ignored.
   setConfig(config: MarkStudioConfig): void;
   // Live, document-ordered list of rendered blocks with their source lines.
   // Returned array is owned by the renderer; callers must not mutate it.
@@ -64,7 +65,13 @@ export function createPreviewRenderer(
   let mathEnabled = initialConfig.math;
   let mermaidEnabled = initialConfig.mermaid;
   let calloutsEnabled = initialConfig.callouts;
-  let md = createMarkdownIt(mathEnabled, mermaidEnabled, calloutsEnabled);
+  let wikiLinksEnabled = initialConfig.wikiLinks;
+  let md = createMarkdownIt(
+    mathEnabled,
+    mermaidEnabled,
+    calloutsEnabled,
+    wikiLinksEnabled
+  );
 
   const root = document.createElement("article");
   root.className = "markstudio-preview-content";
@@ -127,14 +134,21 @@ export function createPreviewRenderer(
       if (
         config.math === mathEnabled &&
         config.mermaid === mermaidEnabled &&
-        config.callouts === calloutsEnabled
+        config.callouts === calloutsEnabled &&
+        config.wikiLinks === wikiLinksEnabled
       ) {
         return;
       }
       mathEnabled = config.math;
       mermaidEnabled = config.mermaid;
       calloutsEnabled = config.callouts;
-      md = createMarkdownIt(mathEnabled, mermaidEnabled, calloutsEnabled);
+      wikiLinksEnabled = config.wikiLinks;
+      md = createMarkdownIt(
+        mathEnabled,
+        mermaidEnabled,
+        calloutsEnabled,
+        wikiLinksEnabled
+      );
       // Force a re-render of the current document under the new pipeline.
       if (lastRendered !== null) {
         render(lastRendered);
@@ -157,14 +171,16 @@ export function createPreviewRenderer(
 }
 
 // Build a markdown-it instance, optionally wired with KaTeX math rendering
-// (T-3.1, ADR-0015), Mermaid diagram blocks (T-3.2, ADR-0016) and callout
-// boxes (T-3.3). Rebuilt (not mutated) whenever a preview-affecting setting
-// flips, because markdown-it plugins/rules cannot be cleanly detached once
-// applied; the rebuild is a settings-change event, never a per-keystroke cost.
+// (T-3.1, ADR-0015), Mermaid diagram blocks (T-3.2, ADR-0016), callout boxes
+// (T-3.3) and wiki-style links (T-3.4). Rebuilt (not mutated) whenever a
+// preview-affecting setting flips, because markdown-it plugins/rules cannot be
+// cleanly detached once applied; the rebuild is a settings-change event, never
+// a per-keystroke cost.
 function createMarkdownIt(
   math: boolean,
   mermaid: boolean,
-  callouts: boolean
+  callouts: boolean,
+  wikiLinks: boolean
 ): MarkdownIt {
   const md = new MarkdownIt({
     // Raw HTML disabled by default for safety (ADR-0008). Phase 3 may revisit
@@ -187,6 +203,9 @@ function createMarkdownIt(
   }
   if (callouts) {
     applyCallouts(md);
+  }
+  if (wikiLinks) {
+    applyWikiLinks(md);
   }
   return md;
 }
