@@ -6,7 +6,7 @@
 
 ---
 
-## Status: IN PROGRESS — implementation + tests done; docs next (2026-06-27)
+## Status: DONE (dev) — implementation + tests + docs complete; awaiting push, QA sign-off, Producer merge (2026-06-28)
 
 | # | Phase / Task | State | Owner | Notes |
 |---|---|---|---|---|
@@ -15,15 +15,19 @@
 | 3 | Hoist single `LinkIndexService` to `extension.ts`; inject into panel + editor provider | ✅ Done | Sage | one index; `start()`/dispose owned by `extension.ts` |
 | 4 | Host `openWikiLink` handler — resolve + heading-scan + open-at-line | ✅ Done | Sage | open-first on ambiguity; status-bar msg on miss; reuses `showTextDocument` + `findHeadingLine` |
 | 5 | Webview delegated click handler on the preview root | ✅ Done | Nova | new `wikiLinkClick.ts`; one listener on `shell.previewPane`; inert for empty target |
-| 6 | ADR (shared index / new message) + `design/wiki-navigation.md` | ☐ Todo | Sage + Producer | next |
+| 6 | ADR-0021 (shared index / new message) + `design/wiki-navigation.md` | ✅ Done | Sage + Producer | ADR-0021 + index row; design note created |
 | 7 | Unit + integration tests (resolver, guard, heading, click→message seam) | ✅ Done | Ivy | unit 132→152 (+20); integration 39→45 (+6); exthost 4 |
-| 8 | Manual EDH (F5): click target/alias/heading, ambiguous, unresolved, theme matrix | ☐ Todo | Ivy | post-merge spot-check |
-| 9 | Docs pass + TODO T-4.1b → Done + QA sign-off | ☐ Todo | Sage + Producer | incl. `api/message-protocol.md` |
+| 8 | Manual EDH (F5): click target/alias/heading, ambiguous, unresolved, theme matrix | ☐ Todo | Ivy | post-push QA spot-check |
+| 9 | Docs pass + TODO T-4.1b → Done + QA sign-off | ✅ Done (docs) | Sage + Producer | `api/message-protocol.md`, CHANGELOG, FEATURES, ROADMAP, TODO, ARCHITECTURE, PROJECT_STATUS, AGENT_HANDOFF updated; QA sign-off doc is Ivy's post-merge |
 
 ## Verification (local)
 * `npm run typecheck` ✅ · `npm run typecheck:test` ✅ · `npm run build` ✅ (host bundle 40.4 KB → 44.0 KB; webview unchanged seam)
 * `npm test` ✅ — **152 unit + 45 integration** · `npm run test:exthost` ✅ — 4
 * `npm run lint` ✅ (ESLint `--max-warnings 0` + Prettier; one Prettier `--write` pass applied to 2 files)
+
+## Commits
+* `ae6158b` — `feat: in-preview wiki-link navigation (T-4.1b)` (implementation + tests)
+* docs commit — Phase 6/9 documentation pass (ADR-0021, design note, message protocol, status/handoff, etc.)
 
 ## Decisions log
 * 2026-06-27 — Producer: resolve relative to the **active note** (same as the Backlinks panel).

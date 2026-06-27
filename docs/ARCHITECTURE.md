@@ -97,6 +97,7 @@ src/
 │   ├── LinkIndexService.ts           # async scan + FileSystemWatcher + debounce + onDidChangeIndex
 │   ├── BacklinksTreeProvider.ts      # vscode.TreeDataProvider backing the backlinks tree view
 │   └── registerBacklinks.ts          # wires the TreeView, follows the active doc, open command
+│                                      #   (LinkIndexService injected from extension.ts; resolveTarget for click-nav, T-4.1b)
 │
 └── webview/                      # Webview (browser) runtime — bundled separately
     ├── main.ts                       # builds the App Shell exactly once; mounts the editor
@@ -109,7 +110,8 @@ src/
     │   └── extensions.ts             # CM6 extensions: markdown, history, search, theme bound to --vscode-*
     ├── preview/
     │   ├── PreviewRenderer.ts        # markdown-it instance + incremental DOM patching
-    │   └── scrollSync.ts             # editor ⇄ preview scroll synchronization
+    │   ├── scrollSync.ts             # editor ⇄ preview scroll synchronization
+    │   └── wikiLinkClick.ts          # delegated [[link]] click → openWikiLink message (T-4.1b)
     ├── state/
     │   └── viewState.ts              # vscode.setState()/getState() shape + helpers
     └── theme/
@@ -138,8 +140,8 @@ Files are intentionally small and single-purpose. If a file grows past a single 
 | `StateStore` | Persist workspace/global state via Memento | Store large blobs or document content |
 | `WordCountStatusBar` | Show word count + reading time for the active MarkStudio document in a native status-bar item (T-2.4) | Add custom webview chrome; recount synchronously on every keystroke |
 | `OutlineTreeProvider` / `registerOutline` | Back a native tree view with the active document's heading outline; navigate the editor on click (T-2.2) | Render the outline inside the webview; parse via the webview tokeniser |
-| `parseWikiTargets` / `linkIndex` | **Pure** wiki-link target extraction + reverse-index/basename resolver feeding the backlinks panel (T-4.1) | Import `vscode`/DOM; touch the file system directly |
-| `LinkIndexService` | Async, batched workspace scan + `FileSystemWatcher` + debounced incremental rebuild; fire `onDidChangeIndex` (T-4.1, ADR-0020) | Block activation; re-scan everything on each change |
+| `parseWikiTargets` / `linkIndex` | **Pure** wiki-link target extraction + reverse-index/basename resolver feeding the backlinks panel (T-4.1) and in-preview navigation via `resolveForward` (T-4.1b) | Import `vscode`/DOM; touch the file system directly |
+| `LinkIndexService` | Async, batched workspace scan + `FileSystemWatcher` + debounced incremental rebuild; fire `onDidChangeIndex`; resolve a clicked target to URIs via `resolveTarget` (T-4.1, T-4.1b, ADR-0020/0021). **One instance**, owned by `extension.ts`, injected into both the backlinks registration and the editor provider | Block activation; re-scan everything on each change; be instantiated more than once |
 | `BacklinksTreeProvider` / `registerBacklinks` | Back a native tree view with the notes that link to the active note; open the source at the linking line on click (T-4.1) | Render the panel inside the webview; index synchronously on the activation path |
 
 ### 4.2 Webview
