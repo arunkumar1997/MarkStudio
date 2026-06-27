@@ -91,6 +91,13 @@ src/
 │   ├── OutlineTreeProvider.ts        # vscode.TreeDataProvider backing the outline tree view
 │   └── registerOutline.ts            # wires the TreeView, follows the active doc, reveal command
 │
+├── links/                        # Host-side workspace link index + backlinks (T-4.1)
+│   ├── parseWikiTargets.ts           # pure wiki-link target extractor (no `vscode`/DOM)
+│   ├── linkIndex.ts                  # pure reverse index + basename resolver (no `vscode`/fs)
+│   ├── LinkIndexService.ts           # async scan + FileSystemWatcher + debounce + onDidChangeIndex
+│   ├── BacklinksTreeProvider.ts      # vscode.TreeDataProvider backing the backlinks tree view
+│   └── registerBacklinks.ts          # wires the TreeView, follows the active doc, open command
+│
 └── webview/                      # Webview (browser) runtime — bundled separately
     ├── main.ts                       # builds the App Shell exactly once; mounts the editor
     ├── app/
@@ -126,11 +133,14 @@ Files are intentionally small and single-purpose. If a file grows past a single 
 | `MarkStudioEditorProvider` | Implement `CustomTextEditorProvider`; create the webview once per editor; bridge document ⇄ webview | Reassign `webview.html` after init; recreate the webview |
 | `MarkStudioDocument` | Hold content, dirty state, and undo/redo; serialize on save; apply external edits | Know anything about the DOM or CodeMirror |
 | `MessageBus` (host side) | Serialize/deserialize typed messages; route them | Leak `vscode` objects into payloads |
-| `FileWatcherService` | Detect external file changes via `createFileSystemWatcher` | Implement custom polling — *deferred: the text-backed editor reconciles via the managed `TextDocument` + `onDidChangeTextDocument` (ADR-0009)* |
+| `FileWatcherService` | Detect external file changes via `createFileSystemWatcher` | Implement custom polling — *deferred for the **editor**: the text-backed editor reconciles via the managed `TextDocument` + `onDidChangeTextDocument` (ADR-0009). A workspace `FileSystemWatcher` **is** used by `LinkIndexService` for cross-file link indexing (ADR-0020)* |
 | `ConfigurationService` | Read `markstudio.*` settings reactively | Cache settings without listening for changes |
 | `StateStore` | Persist workspace/global state via Memento | Store large blobs or document content |
 | `WordCountStatusBar` | Show word count + reading time for the active MarkStudio document in a native status-bar item (T-2.4) | Add custom webview chrome; recount synchronously on every keystroke |
 | `OutlineTreeProvider` / `registerOutline` | Back a native tree view with the active document's heading outline; navigate the editor on click (T-2.2) | Render the outline inside the webview; parse via the webview tokeniser |
+| `parseWikiTargets` / `linkIndex` | **Pure** wiki-link target extraction + reverse-index/basename resolver feeding the backlinks panel (T-4.1) | Import `vscode`/DOM; touch the file system directly |
+| `LinkIndexService` | Async, batched workspace scan + `FileSystemWatcher` + debounced incremental rebuild; fire `onDidChangeIndex` (T-4.1, ADR-0020) | Block activation; re-scan everything on each change |
+| `BacklinksTreeProvider` / `registerBacklinks` | Back a native tree view with the notes that link to the active note; open the source at the linking line on click (T-4.1) | Render the panel inside the webview; index synchronously on the activation path |
 
 ### 4.2 Webview
 

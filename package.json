@@ -173,6 +173,11 @@
           "id": "markstudio.outline",
           "name": "MarkStudio Outline",
           "when": "activeCustomEditorId == 'markstudio.editor'"
+        },
+        {
+          "id": "markstudio.backlinks",
+          "name": "MarkStudio Backlinks",
+          "when": "activeCustomEditorId == 'markstudio.editor'"
         }
       ]
     }

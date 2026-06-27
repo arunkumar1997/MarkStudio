@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { MarkStudioEditorProvider } from "./editor/MarkStudioEditorProvider";
 import { registerCommands } from "./commands/registerCommands";
 import { registerOutline } from "./outline/registerOutline";
+import { registerBacklinks } from "./links/registerBacklinks";
 import { StateStore } from "./services/StateStore";
 import { ConfigurationService } from "./services/ConfigurationService";
 import { WordCountStatusBar } from "./status/WordCountStatusBar";
@@ -27,6 +28,7 @@ export function activate(context: vscode.ExtensionContext): void {
     disposable,
     registerCommands(provider),
     registerOutline(provider),
+    registerBacklinks(provider),
     wordCountStatusBar,
     provider.onDidChangeActiveDocument((document) => {
       wordCountStatusBar.setActiveDocument(document);

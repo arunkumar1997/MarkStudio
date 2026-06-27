@@ -4,7 +4,7 @@
 >
 > Each task has: an **ID**, a **description**, **files involved** (planned paths from [ARCHITECTURE.md](ARCHITECTURE.md)), **dependencies**, and a **complexity** estimate (S / M / L).
 
-The immediate focus is now **Phase 4 — Knowledge Management** ([ROADMAP.md](ROADMAP.md)). Phase 1 — Editing Core, Phase 2 — Editing Quality, and **Phase 3 — Modern Markdown** are complete (M3.1 math, M3.2 Mermaid, M3.3 callouts, M3.4 wiki links, M3.5 footnotes & GFM completeness). The recommended next task is in [AGENT_HANDOFF.md](AGENT_HANDOFF.md) §10.
+The immediate focus is now **Phase 4 — Knowledge Management** ([ROADMAP.md](ROADMAP.md)). Phase 1 — Editing Core, Phase 2 — Editing Quality, and **Phase 3 — Modern Markdown** are complete (M3.1 math, M3.2 Mermaid, M3.3 callouts, M3.4 wiki links, M3.5 footnotes & GFM completeness). **Phase 4 is under way: M4.1 — Backlinks panel (T-4.1) is Done** (awaiting QA sign-off + Producer merge). The recommended next task is in [AGENT_HANDOFF.md](AGENT_HANDOFF.md) §10.
 
 ---
 
@@ -17,6 +17,26 @@ The immediate focus is now **Phase 4 — Knowledge Management** ([ROADMAP.md](RO
 ## Medium Priority — Phase 1 Robustness
 
 *(none — Phase 1 robustness tasks are all complete)*
+
+## Medium Priority — Phase 4 follow-ups (from T-4.1)
+
+### T-4.1a · Markdown-link backlinks
+* **Description:** Index standard Markdown links (`[text](note.md)`) as backlinks in addition to wiki-links. A second extractor feeds the same `LinkIndexService` / `linkIndex` reverse index; resolve relative `.md` paths (and bare basenames) the same way the wiki-link resolver does.
+* **Files involved:** `src/links/parseMarkdownTargets.ts` (new), `src/links/LinkIndexService.ts`, `src/links/linkIndex.ts`
+* **Dependencies:** T-4.1
+* **Complexity:** M
+
+### T-4.1b · In-preview wiki-link navigation
+* **Description:** Make `[[target]]` clickable **inside the preview** — resolve the target via the host-side resolver (T-4.1) and open the note. Needs a webview → host message carrying the clicked target + the active document URI, then `markstudio.backlinks.open`-style navigation host-side.
+* **Files involved:** `src/webview/preview/wikiLinks.ts`, `src/messaging/messages.ts`, `src/links/` (resolver reuse), `src/editor/MarkStudioEditorProvider.ts`
+* **Dependencies:** T-4.1, T-3.4
+* **Complexity:** M
+
+### T-4.1c · Heading-level backlinks
+* **Description:** Group/resolve `[[note#heading]]` at the heading level rather than only capturing the heading and grouping per file. Reuses the host-side heading scanner (`src/outline/headings.ts`) to map a heading anchor to a line.
+* **Files involved:** `src/links/linkIndex.ts`, `src/links/BacklinksTreeProvider.ts`, `src/outline/headings.ts`
+* **Dependencies:** T-4.1, T-2.2
+* **Complexity:** M
 
 ## Low Priority
 
@@ -42,6 +62,7 @@ The immediate focus is now **Phase 4 — Knowledge Management** ([ROADMAP.md](RO
 
 ## Done
 
+* **T-4.1 · Backlinks panel (M4.1)** — Added a native `MarkStudio Backlinks` tree view (Explorer container, visible only while a MarkStudio editor is active) that lists every *other* workspace note linking to the active note via a wiki-link (`[[note]]`), one node per source note + linking line; clicking opens the source at the linking line. First **Phase 4** feature; also lands the **wiki-link resolver** deferred from Phase 3 (T-3.4 / ADR-0018). New host-side `src/links/` mirrors `src/outline/`: pure `parseWikiTargets.ts` (target extractor reusing the T-3.4 syntax rules; skips code fences / front matter / inline code), pure `linkIndex.ts` (`buildLinkIndex` — reverse index + **case-insensitive basename resolver**, path-qualified **relative-first**, ambiguous → all, no self-link, `#heading` captured-but-file-resolved), `LinkIndexService.ts` (async batched `findFiles` + `fs.readFile` scan **not awaited** on activation, `FileSystemWatcher` on `**/*.md`, 250 ms debounce, incremental per-file re-parse, `onDidChangeIndex`), `BacklinksTreeProvider.ts`, and `registerBacklinks.ts` (follows `onDidChangeActiveDocument`, refreshes on `onDidChangeIndex`, registers the internal `markstudio.backlinks.open` command). Wired from `extension.ts` alongside `registerOutline`; `package.json` contributes the `markstudio.backlinks` view. **No new dependency, no new setting, no webview/protocol change** (host-side like the Outline). New **ADR-0020** (explains why a `FileSystemWatcher` is warranted here vs ADR-0009) and [design/backlinks.md](design/backlinks.md). Host bundle **~25.4 KB → ~40.4 KB**; 41 new pure unit tests, unit 93 → 129. *(2026-06-27 — see [CHANGELOG.md](CHANGELOG.md))*
 * **T-3.5 · Footnotes & GFM completeness (M3.5)** — Added footnotes (`[^1]` references + `[^1]:` definitions), GFM task lists (`- [ ]` / `- [x]`, rendered as **disabled** read-only checkboxes), GFM tables, and strikethrough (`~~text~~`) to the preview, **each individually toggleable** via a new `markstudio.preview.{footnotes,taskLists,tables,strikethrough}` setting (boolean, default `true`, `resource` scope) threaded through the `MarkStudioConfig` + `configChanged` seam (T-111) and degrading gracefully when off. Per-feature sourcing (ADR-0019): tables + strikethrough use markdown-it's **built-in** rulers (toggled via `md.disable`), task lists are a **dependency-free** in-tree core rule (`src/webview/preview/taskLists.ts`, `applyTaskLists`), and footnotes use the one new runtime dependency, **`markdown-it-footnote`**. `createMarkdownIt(...)` wires each when on and `setConfig` rebuilds the single markdown-it instance when any preview flag flips (ADR-0008). Themed entirely via `--vscode-*` variables. New **ADR-0019** and [design/gfm.md](design/gfm.md). One runtime dep (`markdown-it-footnote`) + `@types/markdown-it-footnote`; production-minified webview **2,025.3 KB → 2,041.4 KB**; unit 85 → 93, integration 26 → 39. **Phase 3 complete.** *(2026-06-27 — see [CHANGELOG.md](CHANGELOG.md))*
 * **T-3.4 · Wiki-style links `[[…]]` (M3.4)** — Added rendering of wiki-style links (`[[note]]`, `[[note|alias]]`, `[[note#heading]]`, `[[note#heading|alias]]`) as styled links in the preview, gated behind a new `markstudio.preview.wikiLinks` setting (boolean, default `true`, `resource` scope) threaded through the `MarkStudioConfig` + `configChanged` seam (T-111). Implemented with **no new dependency** as a small markdown-it **inline rule** (`src/webview/preview/wikiLinks.ts`, `applyWikiLinks`) registered **before** the built-in `link` rule: a `[[` opener is claimed before the ordinary `[link](url)` parser, scanned to its `]]`, rejected if it contains a newline or nested `[`/`]`, then parsed into target / alias / heading and emitted as an `<a class="markstudio-wikilink">` carrying `data-wikilink-target`, an optional `data-wikilink-heading`, and a `title` tooltip. `createMarkdownIt(math, mermaid, callouts, wikiLinks)` applies it only when on and `setConfig` rebuilds when the flag flips (ADR-0008); with wiki links off a `[[note]]` degrades to literal text. Styled entirely via `--vscode-*` variables (link colour + dashed underline; resolution to real files is deferred to Phase 4). New **ADR-0018** and [design/wiki-links.md](design/wiki-links.md). No dependency; unit 83 → 85, integration 20 → 26. *(2026-06-27 — see [CHANGELOG.md](CHANGELOG.md))*
 * **T-3.3 · Callouts / admonitions (M3.3)** — Added rendering of GitHub-style callout blockquotes (`> [!NOTE]`, `> [!TIP]`, `> [!IMPORTANT]`, `> [!WARNING]`, `> [!CAUTION]`) as themed boxes with a Codicon icon + title in the preview, gated behind a new `markstudio.preview.callouts` setting (boolean, default `true`, `resource` scope) threaded through the `MarkStudioConfig` + `configChanged` seam (T-111). Implemented with **no new dependency** as a small markdown-it **core rule** (`src/webview/preview/callouts.ts`, `applyCallouts`) that post-processes the token stream: a `blockquote_open` whose first paragraph starts with a known `[!TYPE]` marker is rewritten to a `<div class="markstudio-callout markstudio-callout-<type>">`, an `html_block` title (icon + escaped label/custom title) is injected, and the marker line is stripped. `createMarkdownIt(math, mermaid, callouts)` applies it only when on and `setConfig` rebuilds when the flag flips (ADR-0008); with callouts off a `> [!NOTE]` block degrades to an ordinary blockquote. Themed entirely via `--vscode-*` variables (one `--markstudio-callout-accent` per type); icons reuse the Codicons font (T-107). New **ADR-0017** and [design/callouts.md](design/callouts.md). No dependency; production-minified webview **~974.3 KB → ~977.7 KB**; unit 81 → 83, integration 15 → 20. *(2026-06-27 — see [CHANGELOG.md](CHANGELOG.md))*
