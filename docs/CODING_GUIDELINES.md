@@ -11,6 +11,12 @@
 * **Explicit public types.** Every exported function, class, and message type has explicit parameter and return types.
 * **Prefer `readonly` and `const`.** Default to immutability; mutate only where necessary and locally.
 
+### Enforcement
+
+* **ESLint** (flat config, `eslint.config.mjs`) encodes the lint-able rules here — `@typescript-eslint` recommended plus no-`any`, explicit exported types, no unused code, `===` over `==`, and no stray `console` (only `warn`/`error`). Run `npm run lint`.
+* **Prettier** (`.prettierrc.json`) owns formatting: 2-space indent, double quotes, semicolons, no trailing commas, 80-column width. `eslint-config-prettier` switches off any ESLint stylistic rules so the two never fight. `npm run lint` runs `prettier --check`; `npm run lint:fix` applies fixes.
+* Both run in CI on every push/PR (TESTING.md §7); a violation fails the pipeline.
+
 ---
 
 ## 2. Files and Modules
@@ -138,4 +144,4 @@ feat:  fix:  perf:  docs:  refactor:  style:  test:  build:  chore:
 
 ## 14. Definition of Done (Code)
 
-A change is done only when it satisfies the Definition of Done in [.ai/START_HERE.md](../.ai/START_HERE.md) §6 and [.ai/WORKFLOW.md](../.ai/WORKFLOW.md) §2.8: compiles under strict TypeScript, tests pass, no hardcoded colors, webview/editor/preview not recreated, verified across themes, and all relevant docs updated.
+A change is done only when it satisfies the Definition of Done in [.ai/START_HERE.md](../.ai/START_HERE.md) §6 and [.ai/WORKFLOW.md](../.ai/WORKFLOW.md) §2.8: compiles under strict TypeScript, `npm run lint` passes clean, tests pass, no hardcoded colors, webview/editor/preview not recreated, verified across themes, and all relevant docs updated.

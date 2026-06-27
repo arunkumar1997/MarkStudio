@@ -12,7 +12,7 @@ import type { ConfigurationService } from "../services/ConfigurationService";
 // reference to the currently active controller so commands can target
 // whichever MarkStudio editor has focus.
 class MarkStudioEditorController {
-  public constructor(private readonly bus: HostMessageBus) { }
+  public constructor(private readonly bus: HostMessageBus) {}
 
   public setLayoutMode(mode: LayoutMode): void {
     this.bus.post({ type: "setLayoutMode", mode });
@@ -45,7 +45,9 @@ export type { MarkStudioEditorController };
 // so dirty state, undo/redo, save and revert integrate natively (ADR-0001,
 // ADR-0002). External document changes (revert, on-disk edits, other editors)
 // are pushed back to the webview as `setContent`.
-export class MarkStudioEditorProvider implements vscode.CustomTextEditorProvider {
+export class MarkStudioEditorProvider
+  implements vscode.CustomTextEditorProvider
+{
   public static readonly viewType = "markstudio.editor";
 
   public static register(
@@ -79,7 +81,7 @@ export class MarkStudioEditorProvider implements vscode.CustomTextEditorProvider
     private readonly context: vscode.ExtensionContext,
     private readonly stateStore: StateStore,
     private readonly configService: ConfigurationService
-  ) { }
+  ) {}
 
   public getActiveController(): MarkStudioEditorController | null {
     return this.activeController;
@@ -154,20 +156,22 @@ export class MarkStudioEditorProvider implements vscode.CustomTextEditorProvider
       }
     });
 
-    const changeSubscription = vscode.workspace.onDidChangeTextDocument((event) => {
-      if (event.document.uri.toString() !== document.uri.toString()) {
-        return;
+    const changeSubscription = vscode.workspace.onDidChangeTextDocument(
+      (event) => {
+        if (event.document.uri.toString() !== document.uri.toString()) {
+          return;
+        }
+        if (
+          lastWebviewEditText !== null &&
+          event.document.getText() === lastWebviewEditText
+        ) {
+          // This change is the one we just applied on behalf of the webview;
+          // the webview already has this text.
+          return;
+        }
+        bus.post({ type: "setContent", text: document.getText() });
       }
-      if (
-        lastWebviewEditText !== null &&
-        event.document.getText() === lastWebviewEditText
-      ) {
-        // This change is the one we just applied on behalf of the webview;
-        // the webview already has this text.
-        return;
-      }
-      bus.post({ type: "setContent", text: document.getText() });
-    });
+    );
 
     // Push live `markstudio.*` setting changes to this webview (T-111). The
     // service holds no snapshot of its own, so we re-read per document URI to

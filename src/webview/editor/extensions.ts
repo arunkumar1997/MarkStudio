@@ -101,16 +101,18 @@ const markstudioTheme = EditorView.theme({
     backgroundColor: "var(--vscode-editor-lineHighlightBackground)"
   },
   ".cm-gutters": {
-    backgroundColor: "var(--vscode-editorGutter-background, var(--vscode-editor-background))",
+    backgroundColor:
+      "var(--vscode-editorGutter-background, var(--vscode-editor-background))",
     color: "var(--vscode-editorLineNumber-foreground)",
     border: "0"
   },
   ".cm-lineNumbers .cm-gutterElement": {
     color: "var(--vscode-editorLineNumber-foreground)"
   },
-  ".cm-focused .cm-activeLineGutter, .cm-focused .cm-lineNumbers .cm-gutterElement.cm-activeLine": {
-    color: "var(--vscode-editorLineNumber-activeForeground)"
-  },
+  ".cm-focused .cm-activeLineGutter, .cm-focused .cm-lineNumbers .cm-gutterElement.cm-activeLine":
+    {
+      color: "var(--vscode-editorLineNumber-activeForeground)"
+    },
   "&.cm-focused": {
     outline: "none"
   },

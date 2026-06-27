@@ -18,57 +18,61 @@ const DOM_SETUP = path.join(INTEGRATION_DIR, "_setup", "dom.ts");
 const OUTFILE = path.join(__dirname, "dist-test", "integration.cjs");
 
 function findTestFiles(dir) {
-    const found = [];
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-        const full = path.join(dir, entry.name);
-        if (entry.isDirectory()) {
-            found.push(...findTestFiles(full));
-        } else if (entry.name.endsWith(".test.ts")) {
-            found.push(full);
-        }
+  const found = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      found.push(...findTestFiles(full));
+    } else if (entry.name.endsWith(".test.ts")) {
+      found.push(full);
     }
-    return found;
+  }
+  return found;
 }
 
 async function build() {
-    const testFiles = findTestFiles(INTEGRATION_DIR);
-    if (testFiles.length === 0) {
-        console.error("[markstudio] no integration test files found under test/integration/");
-        process.exit(1);
-    }
+  const testFiles = findTestFiles(INTEGRATION_DIR);
+  if (testFiles.length === 0) {
+    console.error(
+      "[markstudio] no integration test files found under test/integration/"
+    );
+    process.exit(1);
+  }
 
-    // Import the DOM setup first so the jsdom globals exist before any source
-    // module is evaluated, then import every integration test file.
-    const entryContents = [
-        `import ${JSON.stringify(DOM_SETUP)};`,
-        ...testFiles.map((file) => `import ${JSON.stringify(file)};`)
-    ].join("\n");
+  // Import the DOM setup first so the jsdom globals exist before any source
+  // module is evaluated, then import every integration test file.
+  const entryContents = [
+    `import ${JSON.stringify(DOM_SETUP)};`,
+    ...testFiles.map((file) => `import ${JSON.stringify(file)};`)
+  ].join("\n");
 
-    await esbuild.build({
-        stdin: {
-            contents: entryContents,
-            resolveDir: __dirname,
-            sourcefile: "integration-entry.ts",
-            loader: "ts"
-        },
-        bundle: true,
-        outfile: OUTFILE,
-        platform: "node",
-        format: "cjs",
-        target: "node18",
-        sourcemap: "inline",
-        logLevel: "info",
-        // jsdom is loaded from node_modules at runtime, not bundled, so its
-        // dynamic requires keep working under the CommonJS output.
-        external: ["jsdom"],
-        // Run the seams against the mock host API instead of the real `vscode`.
-        alias: { vscode: MOCK_VSCODE }
-    });
+  await esbuild.build({
+    stdin: {
+      contents: entryContents,
+      resolveDir: __dirname,
+      sourcefile: "integration-entry.ts",
+      loader: "ts"
+    },
+    bundle: true,
+    outfile: OUTFILE,
+    platform: "node",
+    format: "cjs",
+    target: "node18",
+    sourcemap: "inline",
+    logLevel: "info",
+    // jsdom is loaded from node_modules at runtime, not bundled, so its
+    // dynamic requires keep working under the CommonJS output.
+    external: ["jsdom"],
+    // Run the seams against the mock host API instead of the real `vscode`.
+    alias: { vscode: MOCK_VSCODE }
+  });
 
-    console.log(`[markstudio] bundled ${testFiles.length} integration test file(s) -> ${path.relative(__dirname, OUTFILE)}`);
+  console.log(
+    `[markstudio] bundled ${testFiles.length} integration test file(s) -> ${path.relative(__dirname, OUTFILE)}`
+  );
 }
 
 build().catch((error) => {
-    console.error(error);
-    process.exit(1);
+  console.error(error);
+  process.exit(1);
 });

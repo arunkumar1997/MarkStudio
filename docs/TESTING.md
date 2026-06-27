@@ -60,10 +60,11 @@ npm run test:unit        # fast unit tests only (bundle + node --test)
 npm run test:integration # jsdom webview-seam tests (bundle + node --test)
 npm run test:exthost     # Extension Host lifecycle tests (build + bundle + boot VS Code)
 npm run typecheck:test   # strict type-check of test sources
-npm run lint             # ESLint (strict TypeScript rules) — pending T-121
+npm run lint             # ESLint (strict TypeScript rules) + Prettier --check
+npm run lint:fix         # auto-fix ESLint findings + Prettier --write
 ```
 
-The unit harness uses Node's built-in runner (`node:test`); esbuild bundles `test/**/*.test.ts` into `dist-test/` and aliases the host-only `vscode` module to `test/_mocks/vscode.ts` (ADR-0011). The integration harness reuses that runner under a jsdom DOM, bundling `test/integration/**/*.test.ts` into `dist-test/integration.cjs` (ADR-0012). The Extension Host harness boots a real VS Code via `@vscode/test-electron`, bundling a launcher (`dist-test/exthost-runner.cjs`) and an in-host suite (`dist-test/exthost-suite.cjs`, `vscode` left external) run by a minimal in-host runner (ADR-0013); it is kept **out** of the default `test` because it downloads a full VS Code. `npm run lint` (T-121) does not exist yet — see [PROJECT_STATUS.md](PROJECT_STATUS.md).
+The unit harness uses Node's built-in runner (`node:test`); esbuild bundles `test/**/*.test.ts` into `dist-test/` and aliases the host-only `vscode` module to `test/_mocks/vscode.ts` (ADR-0011). The integration harness reuses that runner under a jsdom DOM, bundling `test/integration/**/*.test.ts` into `dist-test/integration.cjs` (ADR-0012). The Extension Host harness boots a real VS Code via `@vscode/test-electron`, bundling a launcher (`dist-test/exthost-runner.cjs`) and an in-host suite (`dist-test/exthost-suite.cjs`, `vscode` left external) run by a minimal in-host runner (ADR-0013); it is kept **out** of the default `test` because it downloads a full VS Code. `npm run lint` (T-121) runs ESLint (flat config, `eslint.config.mjs`) with `--max-warnings 0` and `prettier --check .`; it runs in CI on every push/PR.
 
 ---
 
@@ -112,9 +113,9 @@ Never delete or skip a failing test to make a build green. If a test fails and t
 
 ## 7. Continuous Integration
 
-CI is **live** (task **T-120**): the GitHub Actions workflow at `.github/workflows/ci.yml` runs on every push to `main` and every pull request, and a red pipeline blocks merge. It has two jobs on `ubuntu-latest`:
+CI is **live** (tasks **T-120, T-121**): the GitHub Actions workflow at `.github/workflows/ci.yml` runs on every push to `main` and every pull request, and a red pipeline blocks merge. It has two jobs on `ubuntu-latest`:
 
-* **build-and-test** — `npm ci`, `npm run typecheck`, `npm run build`, then `npm test` (the unit + integration layers).
+* **build-and-test** — `npm ci`, `npm run lint`, `npm run typecheck`, `npm run build`, then `npm test` (the unit + integration layers).
 * **extension-host-tests** — `npm ci`, then `xvfb-run -a npm run test:exthost` (the Extension Host layer needs a display, so it runs under `xvfb` on the headless Linux runner). The VS Code build downloaded by `@vscode/test-electron` (~280 MB) is cached under `.vscode-test/`, keyed on `package-lock.json`, so only the first run (or a dependency bump) re-downloads it.
 
-Linting (`npm run lint`) is not wired yet — it lands with **T-121** (ESLint), at which point a lint step is added to the **build-and-test** job.
+Linting and format-checking (`npm run lint` — ESLint + `prettier --check`) run in the **build-and-test** job and fail the pipeline on any violation (T-121).

@@ -23,56 +23,58 @@ const INTEGRATION_DIR = path.join(TEST_DIR, "integration");
 const EXTHOST_DIR = path.join(TEST_DIR, "exthost");
 
 function findTestFiles(dir) {
-    const found = [];
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-        const full = path.join(dir, entry.name);
-        if (entry.isDirectory()) {
-            if (full === INTEGRATION_DIR || full === EXTHOST_DIR) {
-                continue;
-            }
-            found.push(...findTestFiles(full));
-        } else if (entry.name.endsWith(".test.ts")) {
-            found.push(full);
-        }
+  const found = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (full === INTEGRATION_DIR || full === EXTHOST_DIR) {
+        continue;
+      }
+      found.push(...findTestFiles(full));
+    } else if (entry.name.endsWith(".test.ts")) {
+      found.push(full);
     }
-    return found;
+  }
+  return found;
 }
 
 async function build() {
-    const testFiles = findTestFiles(TEST_DIR);
-    if (testFiles.length === 0) {
-        console.error("[markstudio] no test files found under test/");
-        process.exit(1);
-    }
+  const testFiles = findTestFiles(TEST_DIR);
+  if (testFiles.length === 0) {
+    console.error("[markstudio] no test files found under test/");
+    process.exit(1);
+  }
 
-    // A virtual entry that imports every test file, so the whole suite bundles
-    // into one runnable file.
-    const entryContents = testFiles
-        .map((file) => `import ${JSON.stringify(file)};`)
-        .join("\n");
+  // A virtual entry that imports every test file, so the whole suite bundles
+  // into one runnable file.
+  const entryContents = testFiles
+    .map((file) => `import ${JSON.stringify(file)};`)
+    .join("\n");
 
-    await esbuild.build({
-        stdin: {
-            contents: entryContents,
-            resolveDir: __dirname,
-            sourcefile: "tests-entry.ts",
-            loader: "ts"
-        },
-        bundle: true,
-        outfile: OUTFILE,
-        platform: "node",
-        format: "cjs",
-        target: "node18",
-        sourcemap: "inline",
-        logLevel: "info",
-        // Run the units against the mock host API instead of the real `vscode`.
-        alias: { vscode: MOCK_VSCODE }
-    });
+  await esbuild.build({
+    stdin: {
+      contents: entryContents,
+      resolveDir: __dirname,
+      sourcefile: "tests-entry.ts",
+      loader: "ts"
+    },
+    bundle: true,
+    outfile: OUTFILE,
+    platform: "node",
+    format: "cjs",
+    target: "node18",
+    sourcemap: "inline",
+    logLevel: "info",
+    // Run the units against the mock host API instead of the real `vscode`.
+    alias: { vscode: MOCK_VSCODE }
+  });
 
-    console.log(`[markstudio] bundled ${testFiles.length} test file(s) -> ${path.relative(__dirname, OUTFILE)}`);
+  console.log(
+    `[markstudio] bundled ${testFiles.length} test file(s) -> ${path.relative(__dirname, OUTFILE)}`
+  );
 }
 
 build().catch((error) => {
-    console.error(error);
-    process.exit(1);
+  console.error(error);
+  process.exit(1);
 });

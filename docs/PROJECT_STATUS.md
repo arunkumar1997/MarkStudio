@@ -6,20 +6,20 @@
 
 ## 1. Snapshot
 
-* **Current phase:** Phase 1 — Editing Core, **in progress**.
-* **Current milestone:** **T-120 — CI pipeline Done.** A GitHub Actions workflow (`.github/workflows/ci.yml`) now runs on every push to `main` and every pull request and gates merges: a **build-and-test** job (`npm ci` → `npm run typecheck` → `npm run build` → `npm test`, the 51 unit + integration tests) and an **extension-host-tests** job (`xvfb-run -a npm run test:exthost`, the 4 Extension Host lifecycle tests on a real VS Code) with the VS Code download cached under `.vscode-test/`. All three automated layers — unit (43) + integration (8) + Extension Host lifecycle (4) — are now wired into CI. The recommended next task is **T-121 — lint/format**.
-* **Overall completion (qualitative):** Phase 0: 100%. Phase 1: ~99% (editor + preview + resizable split + per-webview layout persistence + three absolute layout commands + Codicon toolbar + five convenience commands + default keybindings + CM6 cursor / scroll snapshot/restore + per-file Memento for layout mode + cursor-preserving external-change reconciliation + editor ⇄ preview scroll sync + reactive configuration service + unit-test harness + jsdom integration layer + Extension Host lifecycle test layer + CI pipeline are live; remaining work: lint/format).
-* **Last updated:** 2026-06-27 by the T-120 session
-* **Last commit on `main`:** *(repository is still not under git; first commit should establish `main`)*
+* **Current phase:** Phase 1 — Editing Core, **effectively complete**.
+* **Current milestone:** **T-121 — Linting and formatting Done.** ESLint (flat config, `eslint.config.mjs`, ESLint 9 + `typescript-eslint`) and Prettier (`.prettierrc.json`) now gate the codebase via `npm run lint`, and a `lint` step runs in the CI **build-and-test** job so a lint or format violation blocks merge. The rules encode [CODING_GUIDELINES.md](CODING_GUIDELINES.md) (no-`any`, explicit exported types, no stray `console`, `===`, no unused code); Prettier owns formatting (2-space, double quotes, semicolons, no trailing commas, 80 cols, `endOfLine: auto`) with `eslint-config-prettier` last. The existing tree was normalised once (mostly 4-space → 2-space indentation). With this, all three test layers + CI + lint/format are in place and **every Phase 1 robustness gap is closed.** The recommended next move is to begin **Phase 2** (see [ROADMAP.md](ROADMAP.md)).
+* **Overall completion (qualitative):** Phase 0: 100%. Phase 1: ~100% (editor + preview + resizable split + per-webview layout persistence + three absolute layout commands + Codicon toolbar + five convenience commands + default keybindings + CM6 cursor / scroll snapshot/restore + per-file Memento for layout mode + cursor-preserving external-change reconciliation + editor ⇄ preview scroll sync + reactive configuration service + unit-test harness + jsdom integration layer + Extension Host lifecycle test layer + CI pipeline + lint/format are all live).
+* **Last updated:** 2026-06-27 by the T-121 session
+* **Last commit on `main`:** *(repository is under git; changes from this session are uncommitted)*
 
 ---
 
 ## 2. Current Focus
 
-* **Active initiative:** **Phase 1 — Editing Core.** T-120 lands the CI pipeline. The workflow `.github/workflows/ci.yml` triggers on push to `main` and on pull requests, with `concurrency` cancelling superseded runs on the same ref. Two `ubuntu-latest` jobs: **build-and-test** runs `npm ci`, `npm run typecheck`, `npm run build`, then `npm test` (unit + integration); **extension-host-tests** runs `npm ci` then `xvfb-run -a npm run test:exthost`, because the Extension Host layer boots a real VS Code via `@vscode/test-electron` and needs a display on the headless runner. The downloaded VS Code build (~280 MB) is cached under `.vscode-test/` keyed on `package-lock.json`, so only the first run (or a dependency bump) re-downloads it; the Extension Host job is split out so that heavy download never blocks the fast unit/integration feedback. **No new dependency, no app-code change.** The remaining Phase 1 robustness gap is lint/format (T-121), at which point a `lint` step joins the build-and-test job.
-* **Owner (current agent):** T-120 session
+* **Active initiative:** **Phase 1 — Editing Core (closing out).** T-121 lands lint/format. `npm run lint` runs `eslint . --max-warnings 0` over the flat config (`eslint.config.mjs`) and then `prettier --check .`; `npm run lint:fix` applies both. ESLint scopes `@typescript-eslint` recommended + the guideline rules to `**/*.ts`, lints the root CommonJS esbuild scripts as Node, and relaxes the exported-type/console rules for `test/**`. Prettier formats source/config (with `docs/`, `*.md`, and the lockfile ignored), and `eslint-config-prettier` removes any stylistic overlap. The CI **build-and-test** job gained a `lint` step before `typecheck`. **Five dev dependencies added** (`eslint`, `@eslint/js`, `typescript-eslint`, `prettier`, `eslint-config-prettier`); no runtime dependency, no app-code logic change, no bundle-size change.
+* **Owner (current agent):** T-121 session
 * **Started:** 2026-06-27
-* **Target outcome:** Land lint/format (T-121) and wire its `lint` step into the CI build-and-test job.
+* **Target outcome:** Phase 1 is complete; begin Phase 2 (see [ROADMAP.md](ROADMAP.md)).
 
 ---
 
@@ -50,13 +50,13 @@ For details, see [FEATURES.md](FEATURES.md). The next gap is the integration-tes
 
 | Item | State | Owner | Notes |
 | ---- | ----- | ----- | ----- |
-| *(none — T-120 closed)* | — | — | T-121 (lint/format) is the recommended next task |
+| *(none — T-121 closed)* | — | — | Phase 1 robustness is complete; Phase 2 is the next initiative |
 
 ---
 
 ## 5. Blockers
 
-* **Blocker:** None. T-121 is unblocked.
+* **Blocker:** None.
 
 ---
 
@@ -75,7 +75,7 @@ For details, see [FEATURES.md](FEATURES.md). The next gap is the integration-tes
 
 ## 7. Technical Debt
 
-* No lint configuration yet (T-121). The unit harness (T-112), the jsdom webview-seam integration harness (T-113), the Extension Host lifecycle harness (T-113b), and the CI pipeline (T-120) are all in place; a `lint` step joins the CI build-and-test job once ESLint lands.
+* The unit harness (T-112), the jsdom webview-seam integration harness (T-113), the Extension Host lifecycle harness (T-113b), the CI pipeline (T-120), and the ESLint/Prettier lint-format gate (T-121) are all in place; lint runs in the CI build-and-test job.
 * The `vscode` mock (`test/_mocks/vscode.ts`) must be kept in step with any new host API a unit under test starts using.
 * jsdom does no real layout, so the integration layer cannot assert pixel-measurement behaviour (scroll-sync geometry, CM6 viewport measurement); those stay in the manual matrix / future `@vscode/test-electron` (T-113b).
 * `applyEdit` failures are console-only; not surfaced as a VS Code notification.
@@ -101,20 +101,20 @@ For details, see [FEATURES.md](FEATURES.md). The next gap is the integration-tes
 
 ## 9. Recently Completed (Last Session)
 
-* Implemented **T-120 — CI pipeline** (GitHub Actions):
-  * Added `.github/workflows/ci.yml`, triggered on push to `main` and on pull requests, with `concurrency` cancelling superseded runs on the same ref and `permissions: contents: read`.
-  * **build-and-test** job (`ubuntu-latest`): `actions/checkout@v4`, `actions/setup-node@v4` (Node 20, npm cache), `npm ci`, `npm run typecheck`, `npm run build`, then `npm test` (43 unit + 8 integration).
-  * **extension-host-tests** job (`ubuntu-latest`): `npm ci`, an `actions/cache@v4` step caching `.vscode-test/` keyed on `package-lock.json`, then `xvfb-run -a npm run test:exthost` — the Extension Host layer boots a real VS Code via `@vscode/test-electron`, which needs a display on the headless runner, and the ~280 MB VS Code download is cached so only the first run re-downloads it.
-  * Split the Extension Host run into its own job so the heavy VS Code download never blocks the fast unit/integration feedback; a red pipeline blocks merge.
-  * Documentation pass: [CHANGELOG.md](CHANGELOG.md), [TESTING.md](TESTING.md) (§7 CI now live), [TODO.md](TODO.md) (T-120 → Done; T-121 now leads), this file, and [AGENT_HANDOFF.md](AGENT_HANDOFF.md).
-  * **No new dependency, no app-code or bundle-size change.** `npm test` (43 unit + 8 integration) and `npm run typecheck` remain green locally; the workflow invokes only existing, verified scripts.
+* Implemented **T-121 — Linting and formatting** (the last Phase 1 robustness gap):
+  * Added `eslint.config.mjs` (ESLint 9 flat config + `typescript-eslint`) encoding the lint-able rules from [CODING_GUIDELINES.md](CODING_GUIDELINES.md): `eqeqeq`, `no-console` (allow `warn`/`error`), `explicit-module-boundary-types`, and `no-unused-vars` (with a `^_` escape hatch). Scoped blocks lint `**/*.ts` with the TS recommended set, the root CommonJS esbuild scripts as Node, and relax exported-type/console rules for `test/**`.
+  * Added `.prettierrc.json` (2-space, double quotes, semicolons, no trailing commas, 80 cols, `endOfLine: auto` for the CRLF tree) and `.prettierignore` (build output, deps, `docs/`, `*.md`, lockfile). `eslint-config-prettier` is applied last so no stylistic rule conflicts.
+  * Added `npm run lint` (`eslint . --max-warnings 0 && prettier --check .`) and `npm run lint:fix`; five lint/format dev dependencies. Added a `lint` step to the CI **build-and-test** job.
+  * One-time `prettier --write` normalised 33 source/config files (mostly 4-space → 2-space indentation; no logic change).
+  * Documentation pass: [CHANGELOG.md](CHANGELOG.md), [CODING_GUIDELINES.md](CODING_GUIDELINES.md), [TESTING.md](TESTING.md), [TODO.md](TODO.md) (T-121 → Done), this file, and [AGENT_HANDOFF.md](AGENT_HANDOFF.md).
+  * **No runtime dependency, no app-code or bundle-size change.** `npm run lint`, `npm run typecheck`, `npm run typecheck:test`, `npm run build`, and `npm test` (43 unit + 8 integration) are all green locally.
 
 ---
 
 ## 10. Recommended Next Task
 
-* **Task:** **T-121 — Linting and formatting.** Configure ESLint with strict TypeScript rules (and a formatter) consistent with [CODING_GUIDELINES.md](CODING_GUIDELINES.md), expose it as `npm run lint`, and add a `lint` step to the CI **build-and-test** job (T-120).
-* **Why this one:** It is the last remaining Phase 1 robustness gap now that all three test layers and CI are in place; wiring `lint` into the existing CI job is a small, natural follow-on.
+* **Task:** **Begin Phase 2** (see [ROADMAP.md](ROADMAP.md)). Phase 1 — Editing Core is complete: editor, preview, split/layout, persistence, reconciliation, scroll sync, configuration service, all three test layers, CI, and lint/format are live.
+* **Why this one:** Every Phase 1 robustness gap is now closed, so the foundation is stable enough to build the next feature set on. Pick the next task ID from [TODO.md](TODO.md) against the Phase 2 scope in [ROADMAP.md](ROADMAP.md).
 * **Suggested prompt:** [.ai/PROMPTS/feature.md](../.ai/PROMPTS/feature.md).
 
 ---

@@ -22,38 +22,38 @@ const RUNNER_OUT = path.join(ROOT, "dist-test", "exthost-runner.cjs");
 const SUITE_OUT = path.join(ROOT, "dist-test", "exthost-suite.cjs");
 
 const common = {
-    bundle: true,
-    platform: "node",
-    format: "cjs",
-    target: "node18",
-    sourcemap: "inline",
-    logLevel: "info"
+  bundle: true,
+  platform: "node",
+  format: "cjs",
+  target: "node18",
+  sourcemap: "inline",
+  logLevel: "info"
 };
 
 async function build() {
-    await esbuild.build({
-        ...common,
-        entryPoints: [RUNNER_ENTRY],
-        outfile: RUNNER_OUT,
-        // @vscode/test-electron downloads/spawns VS Code via dynamic requires;
-        // keep it external so it runs from node_modules.
-        external: ["@vscode/test-electron"]
-    });
+  await esbuild.build({
+    ...common,
+    entryPoints: [RUNNER_ENTRY],
+    outfile: RUNNER_OUT,
+    // @vscode/test-electron downloads/spawns VS Code via dynamic requires;
+    // keep it external so it runs from node_modules.
+    external: ["@vscode/test-electron"]
+  });
 
-    await esbuild.build({
-        ...common,
-        entryPoints: [SUITE_ENTRY],
-        outfile: SUITE_OUT,
-        // `vscode` is injected by the Extension Host at runtime, never bundled.
-        external: ["vscode"]
-    });
+  await esbuild.build({
+    ...common,
+    entryPoints: [SUITE_ENTRY],
+    outfile: SUITE_OUT,
+    // `vscode` is injected by the Extension Host at runtime, never bundled.
+    external: ["vscode"]
+  });
 
-    console.log(
-        `[markstudio] bundled Extension Host runner + suite -> ${path.relative(ROOT, RUNNER_OUT)}, ${path.relative(ROOT, SUITE_OUT)}`
-    );
+  console.log(
+    `[markstudio] bundled Extension Host runner + suite -> ${path.relative(ROOT, RUNNER_OUT)}, ${path.relative(ROOT, SUITE_OUT)}`
+  );
 }
 
 build().catch((error) => {
-    console.error(error);
-    process.exit(1);
+  console.error(error);
+  process.exit(1);
 });

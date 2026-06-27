@@ -13,38 +13,38 @@
 // ─── Minimal value types ────────────────────────────────────────────────────
 
 export class Position {
-    public constructor(
-        public readonly line: number,
-        public readonly character: number
-    ) { }
+  public constructor(
+    public readonly line: number,
+    public readonly character: number
+  ) {}
 }
 
 export class Range {
-    public constructor(
-        public readonly start: Position,
-        public readonly end: Position
-    ) { }
+  public constructor(
+    public readonly start: Position,
+    public readonly end: Position
+  ) {}
 }
 
 export interface RecordedReplace {
-    readonly uri: unknown;
-    readonly range: Range;
-    readonly insert: string;
+  readonly uri: unknown;
+  readonly range: Range;
+  readonly insert: string;
 }
 
 export class WorkspaceEdit {
-    public readonly replacements: RecordedReplace[] = [];
+  public readonly replacements: RecordedReplace[] = [];
 
-    public replace(uri: unknown, range: Range, insert: string): void {
-        this.replacements.push({ uri, range, insert });
-    }
+  public replace(uri: unknown, range: Range, insert: string): void {
+    this.replacements.push({ uri, range, insert });
+  }
 }
 
 class Disposable {
-    public constructor(private readonly onDispose: () => void) { }
-    public dispose(): void {
-        this.onDispose();
-    }
+  public constructor(private readonly onDispose: () => void) {}
+  public dispose(): void {
+    this.onDispose();
+  }
 }
 
 // ─── Mutable mock state + control surface ───────────────────────────────────
@@ -55,71 +55,71 @@ let configValues: Record<string, unknown> = {};
 let changeListeners: Array<(event: ConfigChangeEvent) => void> = [];
 
 interface ConfigChangeEvent {
-    affectsConfiguration(section: string): boolean;
+  affectsConfiguration(section: string): boolean;
 }
 
 // Control what `workspace.applyEdit` resolves to.
 export function __setApplyEditResult(value: boolean): void {
-    applyEditResult = value;
+  applyEditResult = value;
 }
 
 // The last `WorkspaceEdit` handed to `workspace.applyEdit` (null if none).
 export function __getLastAppliedEdit(): WorkspaceEdit | null {
-    return lastAppliedEdit;
+  return lastAppliedEdit;
 }
 
 // Seed the values `workspace.getConfiguration(...).get(key, default)` returns.
 // Keys are dotted paths relative to the section, e.g. "editor.lineNumbers".
 export function __setConfigValues(values: Record<string, unknown>): void {
-    configValues = values;
+  configValues = values;
 }
 
 // Fire an `onDidChangeConfiguration` event. `affected` is the list of section
 // prefixes that changed (e.g. ["markstudio"] or ["editor"]).
 export function __fireConfigChange(affected: ReadonlyArray<string>): void {
-    const event: ConfigChangeEvent = {
-        affectsConfiguration: (section) =>
-            affected.some((a) => a === section || a.startsWith(`${section}.`))
-    };
-    for (const listener of [...changeListeners]) {
-        listener(event);
-    }
+  const event: ConfigChangeEvent = {
+    affectsConfiguration: (section) =>
+      affected.some((a) => a === section || a.startsWith(`${section}.`))
+  };
+  for (const listener of [...changeListeners]) {
+    listener(event);
+  }
 }
 
 // Reset all mock state between tests.
 export function __reset(): void {
-    applyEditResult = true;
-    lastAppliedEdit = null;
-    configValues = {};
-    changeListeners = [];
+  applyEditResult = true;
+  lastAppliedEdit = null;
+  configValues = {};
+  changeListeners = [];
 }
 
 // ─── The `vscode.workspace` subset under test ───────────────────────────────
 
 export const workspace = {
-    applyEdit(edit: WorkspaceEdit): Promise<boolean> {
-        lastAppliedEdit = edit;
-        return Promise.resolve(applyEditResult);
-    },
+  applyEdit(edit: WorkspaceEdit): Promise<boolean> {
+    lastAppliedEdit = edit;
+    return Promise.resolve(applyEditResult);
+  },
 
-    getConfiguration(_section: string, _resource?: unknown) {
-        return {
-            get<T>(key: string, defaultValue: T): T {
-                return (
-                    Object.prototype.hasOwnProperty.call(configValues, key)
-                        ? configValues[key]
-                        : defaultValue
-                ) as T;
-            }
-        };
-    },
+  getConfiguration(_section: string, _resource?: unknown) {
+    return {
+      get<T>(key: string, defaultValue: T): T {
+        return (
+          Object.prototype.hasOwnProperty.call(configValues, key)
+            ? configValues[key]
+            : defaultValue
+        ) as T;
+      }
+    };
+  },
 
-    onDidChangeConfiguration(
-        listener: (event: ConfigChangeEvent) => void
-    ): Disposable {
-        changeListeners.push(listener);
-        return new Disposable(() => {
-            changeListeners = changeListeners.filter((l) => l !== listener);
-        });
-    }
+  onDidChangeConfiguration(
+    listener: (event: ConfigChangeEvent) => void
+  ): Disposable {
+    changeListeners.push(listener);
+    return new Disposable(() => {
+      changeListeners = changeListeners.filter((l) => l !== listener);
+    });
+  }
 };

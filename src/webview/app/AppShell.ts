@@ -16,10 +16,7 @@
 import type { LayoutMode } from "../../messaging/messages";
 import { createSplitView, type SplitView } from "./SplitView";
 import { createToolbar, type Toolbar } from "./Toolbar";
-import {
-  clampRatio,
-  type ViewStateStore
-} from "../state/viewState";
+import { clampRatio, type ViewStateStore } from "../state/viewState";
 
 export type { LayoutMode };
 

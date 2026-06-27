@@ -120,6 +120,8 @@
     "watch": "node esbuild.js --watch",
     "typecheck": "tsc --noEmit",
     "typecheck:test": "tsc -p tsconfig.test.json",
+    "lint": "eslint . --max-warnings 0 && prettier --check .",
+    "lint:fix": "eslint . --fix && prettier --write .",
     "compile": "npm run typecheck && npm run build",
     "test:unit": "node esbuild.test.js && node --test dist-test/tests.cjs",
     "test:integration": "node esbuild.integration.js && node --test dist-test/integration.cjs",
@@ -137,6 +139,7 @@
     "markdown-it": "^14.2.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.4",
     "@types/jsdom": "^28.0.3",
     "@types/markdown-it": "^14.1.2",
     "@types/node": "^20.11.0",
@@ -144,8 +147,12 @@
     "@vscode/codicons": "^0.0.45",
     "@vscode/test-electron": "^2.5.2",
     "esbuild": "^0.20.2",
+    "eslint": "^9.39.4",
+    "eslint-config-prettier": "^9.1.2",
     "jsdom": "^29.1.1",
-    "typescript": "^5.4.5"
+    "prettier": "^3.8.5",
+    "typescript": "^5.4.5",
+    "typescript-eslint": "^8.62.0"
   },
   "allowScripts": {
     "esbuild@0.20.2": true

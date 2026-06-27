@@ -14,28 +14,28 @@ import type { LayoutMode } from "../messaging/messages";
 const LAYOUT_MODE_KEY_PREFIX = "markstudio.layoutMode:";
 
 const LAYOUT_MODES: ReadonlySet<string> = new Set([
-    "split",
-    "editor-only",
-    "preview-only"
+  "split",
+  "editor-only",
+  "preview-only"
 ]);
 
 export class StateStore {
-    public constructor(private readonly memento: vscode.Memento) { }
+  public constructor(private readonly memento: vscode.Memento) {}
 
-    public getLayoutMode(uri: vscode.Uri): LayoutMode | undefined {
-        const raw = this.memento.get<unknown>(layoutModeKey(uri));
-        return isLayoutMode(raw) ? raw : undefined;
-    }
+  public getLayoutMode(uri: vscode.Uri): LayoutMode | undefined {
+    const raw = this.memento.get<unknown>(layoutModeKey(uri));
+    return isLayoutMode(raw) ? raw : undefined;
+  }
 
-    public async setLayoutMode(uri: vscode.Uri, mode: LayoutMode): Promise<void> {
-        await this.memento.update(layoutModeKey(uri), mode);
-    }
+  public async setLayoutMode(uri: vscode.Uri, mode: LayoutMode): Promise<void> {
+    await this.memento.update(layoutModeKey(uri), mode);
+  }
 }
 
 function layoutModeKey(uri: vscode.Uri): string {
-    return LAYOUT_MODE_KEY_PREFIX + uri.toString();
+  return LAYOUT_MODE_KEY_PREFIX + uri.toString();
 }
 
 function isLayoutMode(value: unknown): value is LayoutMode {
-    return typeof value === "string" && LAYOUT_MODES.has(value);
+  return typeof value === "string" && LAYOUT_MODES.has(value);
 }

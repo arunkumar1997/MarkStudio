@@ -142,7 +142,7 @@ function patch(
     suffix < cache.length - prefix &&
     suffix < newHtml.length - prefix &&
     cache[cache.length - 1 - suffix].html ===
-    newHtml[newHtml.length - 1 - suffix]
+      newHtml[newHtml.length - 1 - suffix]
   ) {
     suffix++;
   }

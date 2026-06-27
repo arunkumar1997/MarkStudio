@@ -10,5 +10,5 @@ import { runAll } from "./harness";
 import "./suite/lifecycle.test";
 
 export function run(): Promise<void> {
-    return runAll();
+  return runAll();
 }

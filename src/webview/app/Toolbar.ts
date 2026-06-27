@@ -15,106 +15,106 @@
 import type { LayoutMode } from "../../messaging/messages";
 
 export interface ToolbarOptions {
-    readonly initialMode: LayoutMode;
-    readonly onSelectMode: (mode: LayoutMode) => void;
+  readonly initialMode: LayoutMode;
+  readonly onSelectMode: (mode: LayoutMode) => void;
 }
 
 export interface Toolbar {
-    readonly element: HTMLElement;
-    setActiveMode(mode: LayoutMode): void;
-    destroy(): void;
+  readonly element: HTMLElement;
+  setActiveMode(mode: LayoutMode): void;
+  destroy(): void;
 }
 
 interface LayoutButtonSpec {
-    readonly mode: LayoutMode;
-    readonly icon: string;
-    readonly label: string;
+  readonly mode: LayoutMode;
+  readonly icon: string;
+  readonly label: string;
 }
 
 const LAYOUT_BUTTONS: ReadonlyArray<LayoutButtonSpec> = [
-    {
-        mode: "editor-only",
-        icon: "codicon-edit",
-        label: "Show editor only"
-    },
-    {
-        mode: "split",
-        icon: "codicon-split-horizontal",
-        label: "Show editor and preview"
-    },
-    {
-        mode: "preview-only",
-        icon: "codicon-preview",
-        label: "Show preview only"
-    }
+  {
+    mode: "editor-only",
+    icon: "codicon-edit",
+    label: "Show editor only"
+  },
+  {
+    mode: "split",
+    icon: "codicon-split-horizontal",
+    label: "Show editor and preview"
+  },
+  {
+    mode: "preview-only",
+    icon: "codicon-preview",
+    label: "Show preview only"
+  }
 ];
 
 export function createToolbar(options: ToolbarOptions): Toolbar {
-    injectToolbarStyles();
+  injectToolbarStyles();
 
-    const element = document.createElement("div");
-    element.className = "markstudio-toolbar";
-    element.setAttribute("role", "toolbar");
-    element.setAttribute("aria-label", "MarkStudio layout");
+  const element = document.createElement("div");
+  element.className = "markstudio-toolbar";
+  element.setAttribute("role", "toolbar");
+  element.setAttribute("aria-label", "MarkStudio layout");
 
-    const group = document.createElement("div");
-    group.className = "markstudio-toolbar__group";
-    group.setAttribute("role", "group");
-    group.setAttribute("aria-label", "Layout mode");
-    element.append(group);
+  const group = document.createElement("div");
+  group.className = "markstudio-toolbar__group";
+  group.setAttribute("role", "group");
+  group.setAttribute("aria-label", "Layout mode");
+  element.append(group);
 
-    const buttonsByMode = new Map<LayoutMode, HTMLButtonElement>();
+  const buttonsByMode = new Map<LayoutMode, HTMLButtonElement>();
 
-    for (const spec of LAYOUT_BUTTONS) {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "markstudio-toolbar__button";
-        button.title = spec.label;
-        button.setAttribute("aria-label", spec.label);
-        button.setAttribute("aria-pressed", "false");
-        button.dataset.mode = spec.mode;
+  for (const spec of LAYOUT_BUTTONS) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "markstudio-toolbar__button";
+    button.title = spec.label;
+    button.setAttribute("aria-label", spec.label);
+    button.setAttribute("aria-pressed", "false");
+    button.dataset.mode = spec.mode;
 
-        const icon = document.createElement("span");
-        icon.className = `codicon ${spec.icon}`;
-        icon.setAttribute("aria-hidden", "true");
-        button.append(icon);
+    const icon = document.createElement("span");
+    icon.className = `codicon ${spec.icon}`;
+    icon.setAttribute("aria-hidden", "true");
+    button.append(icon);
 
-        button.addEventListener("click", () => {
-            options.onSelectMode(spec.mode);
-        });
+    button.addEventListener("click", () => {
+      options.onSelectMode(spec.mode);
+    });
 
-        group.append(button);
-        buttonsByMode.set(spec.mode, button);
+    group.append(button);
+    buttonsByMode.set(spec.mode, button);
+  }
+
+  function setActiveMode(mode: LayoutMode): void {
+    for (const [candidate, button] of buttonsByMode) {
+      const active = candidate === mode;
+      button.setAttribute("aria-pressed", active ? "true" : "false");
+      button.classList.toggle("markstudio-toolbar__button--active", active);
     }
+  }
 
-    function setActiveMode(mode: LayoutMode): void {
-        for (const [candidate, button] of buttonsByMode) {
-            const active = candidate === mode;
-            button.setAttribute("aria-pressed", active ? "true" : "false");
-            button.classList.toggle("markstudio-toolbar__button--active", active);
-        }
+  setActiveMode(options.initialMode);
+
+  return {
+    element,
+    setActiveMode,
+    destroy(): void {
+      element.remove();
     }
-
-    setActiveMode(options.initialMode);
-
-    return {
-        element,
-        setActiveMode,
-        destroy(): void {
-            element.remove();
-        }
-    };
+  };
 }
 
 let stylesInjected = false;
 
 function injectToolbarStyles(): void {
-    if (stylesInjected) {
-        return;
-    }
-    stylesInjected = true;
-    const style = document.createElement("style");
-    style.textContent = `
+  if (stylesInjected) {
+    return;
+  }
+  stylesInjected = true;
+  const style = document.createElement("style");
+  style.textContent = `
     .markstudio-toolbar {
       flex: 0 0 auto;
       display: flex;
@@ -160,5 +160,5 @@ function injectToolbarStyles(): void {
       line-height: 1;
     }
   `;
-    document.head.append(style);
+  document.head.append(style);
 }

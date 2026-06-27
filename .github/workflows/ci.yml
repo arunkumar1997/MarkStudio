@@ -1,6 +1,6 @@
-# Continuous Integration for MarkStudio (T-120).
+# Continuous Integration for MarkStudio (T-120, T-121).
 #
-# Runs the build and every available automated test layer on push and pull
+# Lints, builds, and runs every available automated test layer on push and pull
 # request. A red pipeline blocks merge (TESTING.md §7).
 #
 # Test layers (TESTING.md §2):
@@ -41,6 +41,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Lint and format check
+        run: npm run lint
 
       - name: Type-check (source)
         run: npm run typecheck

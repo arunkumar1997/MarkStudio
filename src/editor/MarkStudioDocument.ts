@@ -45,7 +45,11 @@ export class MarkStudioDocument {
   // `WorkspaceEdit` resolves every range against the original document state,
   // so non-overlapping CM6 change ranges map directly without reindexing.
   public async applyChanges(
-    changes: ReadonlyArray<{ readonly from: number; readonly to: number; readonly insert: string }>
+    changes: ReadonlyArray<{
+      readonly from: number;
+      readonly to: number;
+      readonly insert: string;
+    }>
   ): Promise<boolean> {
     if (changes.length === 0) {
       return true;

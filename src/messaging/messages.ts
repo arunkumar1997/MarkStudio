@@ -177,7 +177,9 @@ function isMarkStudioConfig(value: unknown): value is MarkStudioConfig {
   return isObject(value) && typeof value.lineNumbers === "boolean";
 }
 
-export function isHostToWebviewMessage(value: unknown): value is HostToWebviewMessage {
+export function isHostToWebviewMessage(
+  value: unknown
+): value is HostToWebviewMessage {
   if (!isObject(value)) {
     return false;
   }
@@ -222,7 +224,9 @@ export function isHostToWebviewMessage(value: unknown): value is HostToWebviewMe
   }
 }
 
-export function isWebviewToHostMessage(value: unknown): value is WebviewToHostMessage {
+export function isWebviewToHostMessage(
+  value: unknown
+): value is WebviewToHostMessage {
   if (!isObject(value)) {
     return false;
   }

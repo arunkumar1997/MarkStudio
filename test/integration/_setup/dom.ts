@@ -14,10 +14,10 @@
 import { JSDOM } from "jsdom";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>", {
-    // Provides requestAnimationFrame / cancelAnimationFrame, which CodeMirror's
-    // view layer schedules measurements through.
-    pretendToBeVisual: true,
-    url: "http://localhost/"
+  // Provides requestAnimationFrame / cancelAnimationFrame, which CodeMirror's
+  // view layer schedules measurements through.
+  pretendToBeVisual: true,
+  url: "http://localhost/"
 });
 
 const { window } = dom;
@@ -27,25 +27,25 @@ const { window } = dom;
 // and helpers (getComputedStyle, requestAnimationFrame, …) resolve at runtime.
 const target = globalThis as unknown as Record<string, unknown>;
 for (const key of Object.getOwnPropertyNames(window)) {
-    if (key in target) {
-        continue;
-    }
-    const value = (window as unknown as Record<string, unknown>)[key];
-    if (typeof value === "function") {
-        target[key] = (value as (...args: unknown[]) => unknown).bind(window);
-    } else {
-        target[key] = value;
-    }
+  if (key in target) {
+    continue;
+  }
+  const value = (window as unknown as Record<string, unknown>)[key];
+  if (typeof value === "function") {
+    target[key] = (value as (...args: unknown[]) => unknown).bind(window);
+  } else {
+    target[key] = value;
+  }
 }
 
 // A few globals must point at the jsdom implementations even though Node 20
 // ships its own (read-only) versions, so define them explicitly.
 function force(key: string, value: unknown): void {
-    Object.defineProperty(globalThis, key, {
-        value,
-        configurable: true,
-        writable: true
-    });
+  Object.defineProperty(globalThis, key, {
+    value,
+    configurable: true,
+    writable: true
+  });
 }
 
 force("window", window);
@@ -60,29 +60,29 @@ force("getComputedStyle", window.getComputedStyle.bind(window));
 // tests assert document content and node identity, not pixel layout, so a
 // no-op observer is sufficient.
 if (!("ResizeObserver" in target)) {
-    class NoopResizeObserver {
-        public observe(): void {
-            /* no layout in jsdom */
-        }
-        public unobserve(): void {
-            /* no layout in jsdom */
-        }
-        public disconnect(): void {
-            /* no layout in jsdom */
-        }
+  class NoopResizeObserver {
+    public observe(): void {
+      /* no layout in jsdom */
     }
-    force("ResizeObserver", NoopResizeObserver);
+    public unobserve(): void {
+      /* no layout in jsdom */
+    }
+    public disconnect(): void {
+      /* no layout in jsdom */
+    }
+  }
+  force("ResizeObserver", NoopResizeObserver);
 }
 
 // Provide a fresh, detached container appended to the jsdom body. Each test
 // gets its own so DOM state never leaks between cases.
 export function createContainer(): HTMLElement {
-    const container = window.document.createElement("div");
-    window.document.body.append(container);
-    return container;
+  const container = window.document.createElement("div");
+  window.document.body.append(container);
+  return container;
 }
 
 // Remove a container created by `createContainer` from the document.
 export function removeContainer(container: HTMLElement): void {
-    container.remove();
+  container.remove();
 }

@@ -12,24 +12,24 @@ import type { MarkStudioConfig } from "../messaging/messages";
 const SECTION = "markstudio";
 
 export class ConfigurationService {
-    // Resolve the current MarkStudio settings for an optional resource. Passing
-    // the document URI lets folder- / language-scoped overrides win; omit it for
-    // the window-level value.
-    public read(resource?: vscode.Uri): MarkStudioConfig {
-        const config = vscode.workspace.getConfiguration(SECTION, resource ?? null);
-        return {
-            lineNumbers: config.get<boolean>("editor.lineNumbers", true)
-        };
-    }
+  // Resolve the current MarkStudio settings for an optional resource. Passing
+  // the document URI lets folder- / language-scoped overrides win; omit it for
+  // the window-level value.
+  public read(resource?: vscode.Uri): MarkStudioConfig {
+    const config = vscode.workspace.getConfiguration(SECTION, resource ?? null);
+    return {
+      lineNumbers: config.get<boolean>("editor.lineNumbers", true)
+    };
+  }
 
-    // Invoke `listener` whenever any `markstudio.*` setting changes. Callers
-    // re-read with `read(resource)` to obtain the new snapshot. Returns a
-    // `Disposable` the caller owns.
-    public onDidChange(listener: () => void): vscode.Disposable {
-        return vscode.workspace.onDidChangeConfiguration((event) => {
-            if (event.affectsConfiguration(SECTION)) {
-                listener();
-            }
-        });
-    }
+  // Invoke `listener` whenever any `markstudio.*` setting changes. Callers
+  // re-read with `read(resource)` to obtain the new snapshot. Returns a
+  // `Disposable` the caller owns.
+  public onDidChange(listener: () => void): vscode.Disposable {
+    return vscode.workspace.onDidChangeConfiguration((event) => {
+      if (event.affectsConfiguration(SECTION)) {
+        listener();
+      }
+    });
+  }
 }

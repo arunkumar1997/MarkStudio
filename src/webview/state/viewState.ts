@@ -111,7 +111,9 @@ function normalizeCursor(value: CursorSnapshot): CursorSnapshot {
   };
 }
 
-function resolveCursorUpdate(value: CursorSnapshot | null): CursorSnapshot | null {
+function resolveCursorUpdate(
+  value: CursorSnapshot | null
+): CursorSnapshot | null {
   return value === null ? null : normalizeCursor(value);
 }
 
@@ -124,7 +126,10 @@ function clampOffset(value: number): number {
   return Math.floor(value);
 }
 
-function cursorsEqual(a: CursorSnapshot | null, b: CursorSnapshot | null): boolean {
+function cursorsEqual(
+  a: CursorSnapshot | null,
+  b: CursorSnapshot | null
+): boolean {
   if (a === null || b === null) {
     return a === b;
   }
@@ -156,7 +161,10 @@ function parseCursor(raw: unknown): CursorSnapshot | null {
     return null;
   }
   const candidate = raw as Record<string, unknown>;
-  if (typeof candidate.anchor !== "number" || typeof candidate.head !== "number") {
+  if (
+    typeof candidate.anchor !== "number" ||
+    typeof candidate.head !== "number"
+  ) {
     return null;
   }
   return normalizeCursor({
