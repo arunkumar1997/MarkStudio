@@ -12,10 +12,14 @@ import {
 // the active MarkStudio editor, refreshes as the link index changes, and opens
 // the source note at the linking line when a backlink is clicked. Returns a
 // single disposable owning every registration (mirrors `registerOutline`).
+//
+// The `LinkIndexService` is **injected** (owned by `extension.ts`) so the same
+// index backs both this panel and in-preview wiki-link navigation (T-4.1b)
+// without a second workspace scan. This function does not start or dispose it.
 export function registerBacklinks(
-  provider: MarkStudioEditorProvider
+  provider: MarkStudioEditorProvider,
+  service: LinkIndexService
 ): vscode.Disposable {
-  const service = new LinkIndexService();
   const treeProvider = new BacklinksTreeProvider(service);
   treeProvider.setActiveDocument(provider.getActiveDocument()?.uri ?? null);
 
@@ -57,17 +61,14 @@ export function registerBacklinks(
     }
   );
 
-  // Begin watching + scanning. Intentionally not awaited — activation must not
-  // block on the workspace scan (ROADMAP Phase 4 exit criterion).
-  service.start();
-
+  // The service is started and disposed by `extension.ts` (it is shared with
+  // in-preview wiki-link navigation), so this disposable does not include it.
   return vscode.Disposable.from(
     treeView,
     activeSubscription,
     indexSubscription,
     openCommand,
-    treeProvider,
-    service
+    treeProvider
   );
 }
 

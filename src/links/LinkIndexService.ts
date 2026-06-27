@@ -107,6 +107,27 @@ export class LinkIndexService implements vscode.Disposable {
     return resolved;
   }
 
+  // Resolve a wiki-link `target` (as written in the note at `fromUri`) to the
+  // workspace note(s) it points at, as openable URIs (T-4.1b). Reuses the same
+  // resolver the backlinks panel builds on (case-insensitive basename;
+  // path-qualified targets resolve relative-first). An ambiguous basename
+  // returns all matches in index order; the caller opens the first. Returns an
+  // empty array when nothing matches or the scan has not run. Never re-scans —
+  // resolution is an in-memory lookup.
+  public resolveTarget(fromUri: vscode.Uri, target: string): vscode.Uri[] {
+    const uris: vscode.Uri[] = [];
+    for (const path of this.index.resolveForward(
+      this.pathOf(fromUri),
+      target
+    )) {
+      const uri = this.uriByPath.get(path);
+      if (uri) {
+        uris.push(uri);
+      }
+    }
+    return uris;
+  }
+
   public dispose(): void {
     this.disposed = true;
     if (this.rebuildTimer !== undefined) {

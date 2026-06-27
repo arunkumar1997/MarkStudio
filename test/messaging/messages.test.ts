@@ -308,6 +308,63 @@ describe("isWebviewToHostMessage", () => {
     });
   });
 
+  describe("openWikiLink", () => {
+    it("accepts a target with a heading", () => {
+      assert.equal(
+        isWebviewToHostMessage({
+          type: "openWikiLink",
+          target: "Note",
+          heading: "Section"
+        }),
+        true
+      );
+    });
+
+    it("accepts a target with a null heading", () => {
+      assert.equal(
+        isWebviewToHostMessage({
+          type: "openWikiLink",
+          target: "Note",
+          heading: null
+        }),
+        true
+      );
+    });
+
+    it("rejects a missing target", () => {
+      assert.equal(
+        isWebviewToHostMessage({ type: "openWikiLink", heading: null }),
+        false
+      );
+    });
+
+    it("rejects a non-string target", () => {
+      assert.equal(
+        isWebviewToHostMessage({
+          type: "openWikiLink",
+          target: 42,
+          heading: null
+        }),
+        false
+      );
+    });
+
+    it("rejects a heading that is neither string nor null", () => {
+      assert.equal(
+        isWebviewToHostMessage({
+          type: "openWikiLink",
+          target: "Note",
+          heading: 7
+        }),
+        false
+      );
+      assert.equal(
+        isWebviewToHostMessage({ type: "openWikiLink", target: "Note" }),
+        false
+      );
+    });
+  });
+
   describe("error", () => {
     it("accepts a string message", () => {
       assert.equal(

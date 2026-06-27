@@ -16,6 +16,7 @@ import {
   type PreviewRenderer
 } from "./preview/PreviewRenderer";
 import { createScrollSync, type ScrollSync } from "./preview/scrollSync";
+import { registerWikiLinkClicks } from "./preview/wikiLinkClick";
 import { createAppShell, type AppShell } from "./app/AppShell";
 import { createViewStateStore } from "./state/viewState";
 
@@ -85,6 +86,9 @@ function mount(): void {
               getBlocks: () => preview?.getBlocks() ?? [],
               isActive: () => shell?.getLayoutMode() === "split"
             });
+            // Delegated wiki-link click handling (T-4.1b). Bound once to the
+            // persistent preview pane, so it survives every preview re-render.
+            registerWikiLinkClicks(shell.previewPane, bus);
             root.setAttribute("aria-busy", "false");
           } else {
             editor?.setContentFromHost(message.text);
