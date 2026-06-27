@@ -73,6 +73,14 @@ describe("buildLinkIndex — basic resolution", () => {
     assert.equal(index.backlinksFor("B.md").length, 1);
   });
 
+  it("resolves a bare basename to a .markdown note", () => {
+    const index = buildLinkIndex([
+      note("A.md", [{ target: "Guide" }]),
+      note("Guide.markdown", [])
+    ]);
+    assert.equal(index.backlinksFor("Guide.markdown").length, 1);
+  });
+
   it("carries the heading anchor through to the backlink", () => {
     const index = buildLinkIndex([
       note("A.md", [{ target: "B", heading: "Setup" }]),
@@ -140,6 +148,11 @@ describe("buildLinkIndex — self-links and duplicates", () => {
   it("does not list a note as its own backlink", () => {
     const index = buildLinkIndex([note("A.md", [{ target: "A" }])]);
     assert.deepEqual(index.backlinksFor("A.md"), []);
+  });
+
+  it("does not self-backlink when the link case differs from the file name", () => {
+    const index = buildLinkIndex([note("Notes.md", [{ target: "notes" }])]);
+    assert.deepEqual(index.backlinksFor("Notes.md"), []);
   });
 
   it("collapses two links to the same target on one line", () => {

@@ -67,6 +67,14 @@ describe("parseWikiTargets — basic syntax", () => {
       { target: "C", heading: null, line: 3 }
     ]);
   });
+
+  it("reports correct line numbers with CRLF line endings", () => {
+    const text = ["# Title", "", "links to [[B]]", "and [[C]]"].join("\r\n");
+    assert.deepEqual(parseWikiTargets(text), [
+      { target: "B", heading: null, line: 2 },
+      { target: "C", heading: null, line: 3 }
+    ]);
+  });
 });
 
 describe("parseWikiTargets — rejections", () => {
