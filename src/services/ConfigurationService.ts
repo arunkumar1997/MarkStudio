@@ -23,7 +23,11 @@ export class ConfigurationService {
       math: config.get<boolean>("preview.math", true),
       mermaid: config.get<boolean>("preview.mermaid", true),
       callouts: config.get<boolean>("preview.callouts", true),
-      wikiLinks: config.get<boolean>("preview.wikiLinks", true)
+      wikiLinks: config.get<boolean>("preview.wikiLinks", true),
+      footnotes: config.get<boolean>("preview.footnotes", true),
+      taskLists: config.get<boolean>("preview.taskLists", true),
+      tables: config.get<boolean>("preview.tables", true),
+      strikethrough: config.get<boolean>("preview.strikethrough", true)
     };
   }
 

@@ -44,6 +44,23 @@ export interface MarkStudioConfig {
   // preview (T-3.4, M3.4). When off the `[[…]]` is left as literal text so
   // rendering never breaks. Resolution to real files is deferred to Phase 4.
   readonly wikiLinks: boolean;
+  // `markstudio.preview.footnotes` — render `[^1]` references + `[^1]:`
+  // definitions as linked footnotes in the preview (T-3.5, M3.5). When off the
+  // `[^1]` markers are left as literal text so rendering never breaks.
+  readonly footnotes: boolean;
+  // `markstudio.preview.taskLists` — render GFM task-list items (`- [ ]` /
+  // `- [x]`) as checkboxes in the preview (T-3.5, M3.5). Checkboxes are
+  // rendered disabled (read-only). When off the items render as ordinary list
+  // items so rendering never breaks.
+  readonly taskLists: boolean;
+  // `markstudio.preview.tables` — render GFM pipe tables in the preview
+  // (T-3.5, M3.5). When off the table source renders as plain paragraphs so
+  // rendering never breaks.
+  readonly tables: boolean;
+  // `markstudio.preview.strikethrough` — render `~~text~~` as struck-through
+  // text in the preview (T-3.5, M3.5). When off the `~~` markers are left as
+  // literal text so rendering never breaks.
+  readonly strikethrough: boolean;
 }
 
 // First content load. Sent once the webview signals `ready`.
@@ -210,7 +227,11 @@ function isMarkStudioConfig(value: unknown): value is MarkStudioConfig {
     typeof value.math === "boolean" &&
     typeof value.mermaid === "boolean" &&
     typeof value.callouts === "boolean" &&
-    typeof value.wikiLinks === "boolean"
+    typeof value.wikiLinks === "boolean" &&
+    typeof value.footnotes === "boolean" &&
+    typeof value.taskLists === "boolean" &&
+    typeof value.tables === "boolean" &&
+    typeof value.strikethrough === "boolean"
   );
 }
 
