@@ -84,6 +84,21 @@
         "title": "Show Graph",
         "category": "MarkStudio",
         "icon": "$(type-hierarchy)"
+      },
+      {
+        "command": "markstudio.templates.create",
+        "title": "New Note from Template",
+        "category": "MarkStudio"
+      },
+      {
+        "command": "markstudio.templates.openExample",
+        "title": "Create Example Template",
+        "category": "MarkStudio"
+      },
+      {
+        "command": "markstudio.dailyNotes.openToday",
+        "title": "Open Today's Note",
+        "category": "MarkStudio"
       }
     ],
     "keybindings": [
@@ -183,6 +198,36 @@
           "default": true,
           "scope": "resource",
           "description": "Render ~~strikethrough~~ text in the MarkStudio preview."
+        },
+        "markstudio.templates.workspaceFolder": {
+          "type": "string",
+          "default": ".markstudio/templates",
+          "scope": "resource",
+          "description": "Workspace-relative folder scanned for MarkStudio note templates."
+        },
+        "markstudio.templates.userFolder": {
+          "type": "string",
+          "default": "",
+          "scope": "application",
+          "description": "Absolute path to a per-user templates folder. Leave empty to use the extension's global storage folder."
+        },
+        "markstudio.dailyNotes.template": {
+          "type": "string",
+          "default": "daily",
+          "scope": "resource",
+          "description": "Basename of the template used by 'MarkStudio: Open Today's Note'."
+        },
+        "markstudio.dailyNotes.folder": {
+          "type": "string",
+          "default": "daily",
+          "scope": "resource",
+          "description": "Workspace-relative folder for daily notes when no daily template is configured."
+        },
+        "markstudio.dailyNotes.dateFormat": {
+          "type": "string",
+          "default": "YYYY-MM-DD",
+          "scope": "resource",
+          "description": "Date format for {{date}} and daily-note filenames. Supports YYYY, MM, DD, HH, mm."
         }
       }
     },
