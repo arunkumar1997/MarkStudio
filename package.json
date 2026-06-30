@@ -19,6 +19,10 @@
     "custom editor"
   ],
   "main": "./dist/extension.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/arunkumar1997/MarkStudio.git"
+  },
   "activationEvents": [],
   "contributes": {
     "customEditors": [
@@ -194,7 +198,8 @@
     "test:unit": "node esbuild.test.js && node --test dist-test/tests.cjs",
     "test:integration": "node esbuild.integration.js && node --test dist-test/integration.cjs",
     "test:exthost": "npm run build && node esbuild.exthost.js && node dist-test/exthost-runner.cjs",
-    "test": "npm run typecheck:test && npm run test:unit && npm run test:integration "
+    "test": "npm run typecheck:test && npm run test:unit && npm run test:integration ",
+    "package": "vsce package --no-dependencies"
   },
   "dependencies": {
     "@codemirror/commands": "^6.6.0",
@@ -220,6 +225,7 @@
     "@types/vscode": "^1.85.0",
     "@vscode/codicons": "^0.0.45",
     "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "^3.2.1",
     "esbuild": "^0.20.2",
     "eslint": "^9.39.4",
     "eslint-config-prettier": "^9.1.2",
