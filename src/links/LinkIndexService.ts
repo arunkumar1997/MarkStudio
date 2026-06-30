@@ -3,6 +3,7 @@ import { parseWikiTargets } from "./parseWikiTargets";
 import {
   buildLinkIndex,
   type Backlink,
+  type GraphEdge,
   type LinkIndex,
   type NoteLink,
   type ParsedNote
@@ -136,6 +137,39 @@ export class LinkIndexService implements vscode.Disposable {
     }
     this.watcher?.dispose();
     this.changeEmitter.dispose();
+  }
+
+  // Every known note path in the workspace, in stable order (sorted ascending).
+  // Used by the M4.4 graph view to produce an isolated node for every note,
+  // even ones with no wiki-links in or out. Returns an empty list until the
+  // initial scan has populated the cache.
+  public getNotePaths(): string[] {
+    return [...this.notes.keys()].sort((a, b) => a.localeCompare(b));
+  }
+
+  // Every resolved (from→to) wiki-link edge in the workspace, deduped per
+  // ordered pair with `weight` counting multi-links. Thin wrapper over the
+  // pure index's `allEdges()` so the graph view does not re-parse the
+  // workspace. Self-edges are already excluded by `buildLinkIndex`.
+  public getEdges(): GraphEdge[] {
+    return this.index.allEdges();
+  }
+
+  // Resolve a note path back to its `vscode.Uri` so a node click in the graph
+  // can be opened via `provider.openInMarkStudio(...)` (PR #4 handshake). The
+  // service already maintains this mapping for backlink opening; this exposes
+  // it for the graph. Returns `undefined` for an unknown path (e.g. a node
+  // that was deleted between the webview's last `graphData` and the click).
+  public uriFor(path: string): vscode.Uri | undefined {
+    return this.uriByPath.get(path);
+  }
+
+  // The path key for `uri` in the same form `getNotePaths` / `getEdges` use,
+  // so the graph view can compute `currentPath` for an active document URI
+  // without duplicating the (workspace-relative, POSIX-normalised) keying
+  // logic the service uses internally.
+  public pathFor(uri: vscode.Uri): string {
+    return this.pathOf(uri);
   }
 
   // Read + parse every workspace `.md` file in bounded-concurrency batches, then

@@ -314,6 +314,110 @@ describe("isHostToWebviewMessage", () => {
       );
     });
   });
+
+  describe("graphData", () => {
+    it("accepts an empty graph", () => {
+      assert.equal(
+        isHostToWebviewMessage({
+          type: "graphData",
+          nodes: [],
+          edges: [],
+          currentPath: null
+        }),
+        true
+      );
+    });
+
+    it("accepts a graph with nodes, edges, and a currentPath", () => {
+      assert.equal(
+        isHostToWebviewMessage({
+          type: "graphData",
+          nodes: [
+            { path: "A.md", label: "A", isCurrent: true },
+            { path: "B.md", label: "B", isCurrent: false }
+          ],
+          edges: [{ from: "A.md", to: "B.md", weight: 1 }],
+          currentPath: "A.md"
+        }),
+        true
+      );
+    });
+
+    it("rejects a non-array nodes / edges", () => {
+      assert.equal(
+        isHostToWebviewMessage({
+          type: "graphData",
+          nodes: "no",
+          edges: [],
+          currentPath: null
+        }),
+        false
+      );
+      assert.equal(
+        isHostToWebviewMessage({
+          type: "graphData",
+          nodes: [],
+          edges: "no",
+          currentPath: null
+        }),
+        false
+      );
+    });
+
+    it("rejects a malformed node", () => {
+      assert.equal(
+        isHostToWebviewMessage({
+          type: "graphData",
+          nodes: [{ path: 1, label: "A", isCurrent: false }],
+          edges: [],
+          currentPath: null
+        }),
+        false
+      );
+      assert.equal(
+        isHostToWebviewMessage({
+          type: "graphData",
+          nodes: [{ path: "A.md", label: "A" }],
+          edges: [],
+          currentPath: null
+        }),
+        false
+      );
+    });
+
+    it("rejects a malformed edge", () => {
+      assert.equal(
+        isHostToWebviewMessage({
+          type: "graphData",
+          nodes: [],
+          edges: [{ from: "A.md", to: "B.md", weight: "1" }],
+          currentPath: null
+        }),
+        false
+      );
+      assert.equal(
+        isHostToWebviewMessage({
+          type: "graphData",
+          nodes: [],
+          edges: [{ from: "A.md", to: "B.md", weight: Number.NaN }],
+          currentPath: null
+        }),
+        false
+      );
+    });
+
+    it("rejects a currentPath that is neither string nor null", () => {
+      assert.equal(
+        isHostToWebviewMessage({
+          type: "graphData",
+          nodes: [],
+          edges: [],
+          currentPath: 0
+        }),
+        false
+      );
+    });
+  });
 });
 
 describe("isWebviewToHostMessage", () => {
@@ -595,6 +699,30 @@ describe("isWebviewToHostMessage", () => {
         true
       );
       assert.equal(isWebviewToHostMessage({ type: "error" }), false);
+    });
+  });
+
+  describe("openGraphNode", () => {
+    it("accepts a non-empty path", () => {
+      assert.equal(
+        isWebviewToHostMessage({ type: "openGraphNode", path: "A.md" }),
+        true
+      );
+    });
+
+    it("rejects a missing or non-string path", () => {
+      assert.equal(isWebviewToHostMessage({ type: "openGraphNode" }), false);
+      assert.equal(
+        isWebviewToHostMessage({ type: "openGraphNode", path: 7 }),
+        false
+      );
+    });
+
+    it("rejects an empty path string", () => {
+      assert.equal(
+        isWebviewToHostMessage({ type: "openGraphNode", path: "" }),
+        false
+      );
     });
   });
 });

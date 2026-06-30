@@ -47,14 +47,29 @@ export interface Backlink {
   readonly heading: string | null;
 }
 
+// A directed graph edge between two workspace notes (M4.4). `from` and `to` are
+// canonical note paths (the same identity `backlinksFor`/`resolveForward` use).
+// Self-edges are excluded (a note never links to itself). Multi-links between
+// the same pair are collapsed: `weight` is the number of `[[…]]` occurrences in
+// the source note that resolve to the target, so `A → B` appears at most once
+// per ordered pair.
+export interface GraphEdge {
+  readonly from: string;
+  readonly to: string;
+  readonly weight: number;
+}
+
 // The built reverse index. `backlinksFor(path)` returns every note that links
 // to the note at `path`, sorted for stable display. `resolveForward(fromPath,
 // target)` is the same resolver the index builds backlinks with, exposed for
 // in-preview wiki-link navigation (T-4.1b) so the panel and click-navigation
-// share one resolution implementation (no parallel logic).
+// share one resolution implementation (no parallel logic). `allEdges()` is
+// the deduped (from→to) view the M4.4 graph builds on (the same data the
+// backlink loop produces, served forward instead of reverse).
 export interface LinkIndex {
   backlinksFor(path: string): Backlink[];
   resolveForward(fromPath: string, target: string): string[];
+  allEdges(): GraphEdge[];
 }
 
 const MD_EXTENSION = /\.(md|markdown)$/i;
@@ -81,6 +96,11 @@ export function buildLinkIndex(notes: ReadonlyArray<ParsedNote>): LinkIndex {
   // Lowercased target path → backlinks pointing at it.
   const reverse = new Map<string, Backlink[]>();
 
+  // Deduped (from→to) edges for the M4.4 graph view. Keyed by a stable
+  // `${fromLower}\u0000${toLower}` so multi-links between the same pair
+  // collapse to one edge with `weight` counting their occurrences.
+  const edges = new Map<string, { from: string; to: string; weight: number }>();
+
   for (const note of notes) {
     for (const link of note.links) {
       const targetPaths = resolveTarget(
@@ -90,7 +110,7 @@ export function buildLinkIndex(notes: ReadonlyArray<ParsedNote>): LinkIndex {
         pathsByBasename
       );
       for (const targetPath of targetPaths) {
-        // A note never backlinks itself.
+        // A note never backlinks (or self-edges) to itself.
         if (targetPath.toLowerCase() === note.path.toLowerCase()) {
           continue;
         }
@@ -106,6 +126,21 @@ export function buildLinkIndex(notes: ReadonlyArray<ParsedNote>): LinkIndex {
           bucket.push(backlink);
         } else {
           reverse.set(lowerTarget, [backlink]);
+        }
+
+        // Dedupe edges: one entry per ordered (from, to) pair, incrementing
+        // `weight` for repeats so the graph can render a heavier line for
+        // multi-linked pairs without showing parallel edges.
+        const edgeKey = `${note.path.toLowerCase()}\u0000${lowerTarget}`;
+        const existing = edges.get(edgeKey);
+        if (existing) {
+          existing.weight += 1;
+        } else {
+          edges.set(edgeKey, {
+            from: note.path,
+            to: targetPath,
+            weight: 1
+          });
         }
       }
     }
@@ -128,6 +163,14 @@ export function buildLinkIndex(notes: ReadonlyArray<ParsedNote>): LinkIndex {
         canonicalByLowerPath,
         pathsByBasename
       );
+    },
+    // Every resolved (from→to) edge in the workspace, deduped per ordered
+    // pair with `weight` counting how many `[[…]]` occurrences in `from`
+    // resolve to `to` (M4.4 graph view). Self-edges are excluded, matching
+    // the backlink rule. Ordering is the order edges were first observed
+    // (stable across rebuilds because notes are iterated in input order).
+    allEdges(): GraphEdge[] {
+      return [...edges.values()];
     }
   };
 }

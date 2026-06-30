@@ -6,15 +6,15 @@
 
 ---
 
-## Status: 🟡 Phase A (design) — IN PROGRESS (this commit)
+## Status: 🟢 Phase B (host model + messaging) — DONE · 🟡 Phase C (webview panel) — NEXT
 
 | # | Phase / Task | State | Owner | Notes |
 |---|---|---|---|---|
-| **A** | **Design + ADR-0023 + `design/graph-view.md`** | 🟡 In progress | Remy / Sage | This commit: `plan.md`, `progress.md`, `design/graph-view.md`, ADR-0023 |
-| 1 | `linkIndex.ts` — pure `allEdges()` (+ unit tests) | ⬜ Pending | Sage | depends on A |
-| 2 | `LinkIndexService.ts` — `getEdges()` / `getNotePaths()` / `uriFor(path)` | ⬜ Pending | Sage | depends on A |
-| 3 | `graphModel.ts` (pure) — `buildGraph` + tests | ⬜ Pending | Sage | depends on 1,2 |
-| 4 | `messages.ts` — `graphData` + `openGraphNode` + guards | ⬜ Pending | Sage | depends on A |
+| **A** | **Design + ADR-0023 + `design/graph-view.md`** | ✅ Done | Remy / Sage | Commit `526db18` |
+| 1 | `linkIndex.ts` — pure `allEdges()` (+ unit tests) | ✅ Done | Sage | +7 unit tests; edge dedup in same build pass |
+| 2 | `LinkIndexService.ts` — `getEdges()` / `getNotePaths()` / `uriFor(path)` / `pathFor(uri)` | ✅ Done | Sage | thin wrappers; no new state |
+| 3 | `graphModel.ts` (pure) — `buildGraph` + tests | ✅ Done | Sage | +18 unit tests; ASCII-codepoint sort for determinism |
+| 4 | `messages.ts` — `graphData` + `openGraphNode` + guards | ✅ Done | Sage | +9 unit tests; both messages boundary-guarded |
 | 5 | `GraphService.ts` — panel lifecycle, debounced post, `openGraphNode` handler | ⬜ Pending | Sage | depends on 2,3,4 |
 | 6 | `package.json` — `markstudio.graph.show` command | ⬜ Pending | Sage | depends on 5 |
 | 7 | `esbuild.js` — third bundle `dist/graph.js` | ⬜ Pending | Sage | depends on A |
@@ -28,12 +28,13 @@
 | 15 | Docs pass + TODO M4.4 Done + ROADMAP Phase 4 close + QA sign-off | ⬜ Pending | Sage + Remy | depends on 14 |
 
 ## Verification (local)
-* `npm run lint` ⬜ · `npm run typecheck` ⬜ · `npm run typecheck:test` ⬜ · `npm run build` ⬜
-* `npm test` ⬜ (baseline: 199 unit + 65 integration; target: 199+~20 unit + 65+~10 integration)
-* `npm run test:exthost` ⬜ (baseline: 9; target: 9+~2)
+* `npm run lint` ✅ · `npm run typecheck` ✅ · `npm run typecheck:test` ✅ · `npm run build` ✅
+* `npm test` ✅ — **233 unit pass (was 199, +34) · 65 integration pass · 0 fail**
+* `npm run test:exthost` ⬜ (baseline: 9; target: 9+~2 after Phase C/D)
 
 ## Commits
-*(none yet — Phase A commit pending)*
+* `526db18` — `docs(sprint-5): M4.4 graph view design + ADR-0023 (Phase A)`
+* _(pending)_ — `feat(graph): host-side graph model + LinkIndex.allEdges + messaging (Phase B, M4.4)`
 
 ## Decisions log
 * 2026-06-30 — Producer: **zero new runtime dependencies**; hand-rolled force simulation + Canvas2D. d3-force / cytoscape.js / vis-network rejected in ADR-0023.
