@@ -14,7 +14,7 @@ import type { LinkIndexService } from "../links/LinkIndexService";
 // reference to the currently active controller so commands can target
 // whichever MarkStudio editor has focus.
 class MarkStudioEditorController {
-  public constructor(private readonly bus: HostMessageBus) {}
+  public constructor(private readonly bus: HostMessageBus) { }
 
   public setLayoutMode(mode: LayoutMode): void {
     this.bus.post({ type: "setLayoutMode", mode });
@@ -52,8 +52,7 @@ export type { MarkStudioEditorController };
 // ADR-0002). External document changes (revert, on-disk edits, other editors)
 // are pushed back to the webview as `setContent`.
 export class MarkStudioEditorProvider
-  implements vscode.CustomTextEditorProvider
-{
+  implements vscode.CustomTextEditorProvider {
   public static readonly viewType = "markstudio.editor";
 
   public static register(
@@ -103,7 +102,7 @@ export class MarkStudioEditorProvider
     private readonly stateStore: StateStore,
     private readonly configService: ConfigurationService,
     private readonly linkIndexService: LinkIndexService
-  ) {}
+  ) { }
 
   public getActiveController(): MarkStudioEditorController | null {
     return this.activeController;
