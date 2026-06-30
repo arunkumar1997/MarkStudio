@@ -3,6 +3,7 @@ import { HostMessageBus } from "../messaging/HostMessageBus";
 import { MarkStudioDocument } from "./MarkStudioDocument";
 import { buildWebviewHtml } from "./webviewHtml";
 import { findHeadingLine } from "../outline/headings";
+import { extractExcerpt } from "../links/linkExcerpt";
 import type { FocusablePane, LayoutMode } from "../messaging/messages";
 import type { StateStore } from "../services/StateStore";
 import type { ConfigurationService } from "../services/ConfigurationService";
@@ -14,7 +15,7 @@ import type { LinkIndexService } from "../links/LinkIndexService";
 // reference to the currently active controller so commands can target
 // whichever MarkStudio editor has focus.
 class MarkStudioEditorController {
-  public constructor(private readonly bus: HostMessageBus) { }
+  public constructor(private readonly bus: HostMessageBus) {}
 
   public setLayoutMode(mode: LayoutMode): void {
     this.bus.post({ type: "setLayoutMode", mode });
@@ -52,7 +53,8 @@ export type { MarkStudioEditorController };
 // ADR-0002). External document changes (revert, on-disk edits, other editors)
 // are pushed back to the webview as `setContent`.
 export class MarkStudioEditorProvider
-  implements vscode.CustomTextEditorProvider {
+  implements vscode.CustomTextEditorProvider
+{
   public static readonly viewType = "markstudio.editor";
 
   public static register(
@@ -102,7 +104,7 @@ export class MarkStudioEditorProvider
     private readonly stateStore: StateStore,
     private readonly configService: ConfigurationService,
     private readonly linkIndexService: LinkIndexService
-  ) { }
+  ) {}
 
   public getActiveController(): MarkStudioEditorController | null {
     return this.activeController;
@@ -182,6 +184,56 @@ export class MarkStudioEditorProvider
     }
   }
 
+  // Resolve a hovered wiki-link (T-4.2) and reply with a capped Markdown
+  // excerpt for the hover card. Resolution reuses the same shared
+  // `LinkIndexService` resolver as click-navigation (open-first on an ambiguous
+  // basename), so hover, click, and backlinks all agree. When a `heading` is
+  // present the excerpt is that heading's section, else the top of the note
+  // (see `extractExcerpt`). An unresolved target — or a read that fails (e.g.
+  // the file was deleted inside the watcher debounce window, so the index still
+  // lists it) — replies `status: "missing"`, so the webview shows a quiet
+  // fallback. The host ships Markdown *text*, never HTML; the webview renders it
+  // with its own `html: false` renderer (ADR-0022). This method never throws —
+  // the caller invokes it fire-and-forget via `void`.
+  private async requestLinkPreview(
+    bus: HostMessageBus,
+    fromUri: vscode.Uri,
+    target: string,
+    heading: string | null
+  ): Promise<void> {
+    const matches = this.linkIndexService.resolveTarget(fromUri, target);
+    if (matches.length === 0) {
+      bus.post({
+        type: "linkPreviewContent",
+        target,
+        heading,
+        status: "missing"
+      });
+      return;
+    }
+
+    const targetUri = matches[0];
+    try {
+      const targetDocument = await vscode.workspace.openTextDocument(targetUri);
+      const text = extractExcerpt(targetDocument.getText(), heading);
+      bus.post({
+        type: "linkPreviewContent",
+        target,
+        heading,
+        status: "ok",
+        text,
+        title: noteTitle(targetUri)
+      });
+    } catch {
+      bus.post({
+        type: "linkPreviewContent",
+        target,
+        heading,
+        status: "missing"
+      });
+    }
+  }
+
   public resolveCustomTextEditor(
     textDocument: vscode.TextDocument,
     webviewPanel: vscode.WebviewPanel,
@@ -231,6 +283,14 @@ export class MarkStudioEditorProvider
             return;
           case "openWikiLink":
             void this.openWikiLink(
+              document.uri,
+              message.target,
+              message.heading
+            );
+            return;
+          case "requestLinkPreview":
+            void this.requestLinkPreview(
+              bus,
               document.uri,
               message.target,
               message.heading
@@ -306,4 +366,12 @@ export class MarkStudioEditorProvider
     // Send once immediately in case the webview is already initialized.
     sendInit();
   }
+}
+
+// The display title for a previewed note: its file basename with the Markdown
+// extension stripped (e.g. `docs/Guide.md` → `Guide`). Used as the hover card's
+// header (T-4.2).
+function noteTitle(uri: vscode.Uri): string {
+  const base = uri.path.substring(uri.path.lastIndexOf("/") + 1);
+  return base.replace(/\.(md|markdown)$/i, "");
 }
