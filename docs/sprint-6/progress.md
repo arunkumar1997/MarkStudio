@@ -22,23 +22,24 @@
 
 ## Verification (local)
 
-- `npm run lint` — pending
-- `npm run typecheck` — pending
-- `npm run typecheck:test` — pending
-- `npm run build` — pending
-- `npm test` — pending (baseline 257 unit + 65 integration)
-- `npm run test:exthost` — pending (baseline 13)
+- `npm run lint` — ✅ clean as of Phase B
+- `npm run typecheck` — ✅ clean as of Phase B
+- `npm run typecheck:test` — ✅ clean as of Phase B
+- `npm run build` — ✅ clean as of Phase B
+- `npm test` — ✅ 290 unit + 65 integration (baseline 257 + 65 → +33 unit from `parseMarkdownTargets`)
+- `npm run test:exthost` — ✅ 13 (unchanged — no new host surface this phase)
 
 ## Commits
 
 * `2fb1537` — `docs(sprint-6): plan + progress tracker` — sprint plan + tracker landed on `feature/sprint-6`.
-* _(Phase A finish)_ — `docs(sprint-6): ADR-0024 + design v2 section (Phase A)` — to be recorded after the commit.
+* `c0c27d5` — `docs(sprint-6): ADR-0024 + design v2 section (Phase A)` — Phase A close-out.
+* _(Phase B finish)_ — `feat(links): Markdown-link backlinks (T-4.1a, Phase B)` — to be recorded after the commit.
 
 ## Bundle sizes (running)
 
 | Bundle | Baseline (post-Sprint-5) | After Sprint 6 | Delta |
 |---|---|---|---|
-| `dist/extension.js` | 65.5 kB | _pending_ | _pending_ |
+| `dist/extension.js` | 65.5 kB | 73.4 kB (Phase B) | +7.9 kB (over plan §7's ~+2 kB target — `parseMarkdownTargets` covers full CommonMark inline-link grammar: balanced parens, angle-bracket form, optional title, escape, fence / front-matter / inline-code skipping. Phase C will add the heading-line cache.) |
 | `dist/webview.js` | 2.0 MB | unchanged | 0 |
 | `dist/mermaid.js` | 7.5 MB | unchanged | 0 |
 | `dist/graph.js` | 19.3 kB | unchanged | 0 |

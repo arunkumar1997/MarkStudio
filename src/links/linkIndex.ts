@@ -2,30 +2,51 @@
 // M4.1). This is the wiki-link **resolver** deferred from Phase 3 (T-3.4 /
 // ADR-0018): it maps a `[[target]]` to the workspace note(s) it points at.
 //
+// Sprint 6 (ADR-0024) additively widens this module to also resolve standard
+// Markdown links (`[text](./note.md)`). `NoteLink` and `Backlink` gain an
+// optional `kind` field (`"wiki" | "markdown"`); when absent / `"wiki"` the
+// behaviour matches the pre-Sprint-6 shape *exactly* so every M4.1 / T-4.1b /
+// M4.2 / M4.4 test passes unchanged.
+//
 // This module imports nothing from `vscode` or the file system — it operates on
 // plain data so it is unit-testable without booting VS Code (the
 // `LinkIndexService` does the I/O and feeds parsed notes in). Note identity is a
 // stable POSIX-style path string (e.g. a workspace-relative path); the service
 // keeps the path → URI mapping.
 //
-// Resolution rules (Producer decisions, plan §4):
+// Wiki-link resolution rules (M4.1, plan §4):
 //   * Case-insensitive **basename** matching: `[[Guide]]` matches `Guide.md`
 //     anywhere in the workspace.
 //   * Path-qualified targets (`[[docs/Guide]]`) resolve **relative to the
 //     source note first**; if no such file exists, fall back to basename.
 //   * An ambiguous basename links **all** matching notes (no error).
 //   * A note never backlinks itself.
+//
+// Markdown-link resolution rules (T-4.1a, ADR-0024 §"Decision"):
+//   * **Explicit-path only — no basename fallback.** Markdown links are
+//     author-explicit paths; fuzzy matching is the wiki affordance.
+//   * Resolved by `joinPath(dirname(sourcePath), destination)` then normalised
+//     (`..`/`.` segments collapsed) and looked up case-insensitively.
+//   * A miss is a drop, not a fallback (the author can switch to `[[…]]` for
+//     fuzzy matching).
 
-// A wiki-link extracted from a source note, with the snippet for display.
+// A wiki-link or Markdown-link extracted from a source note, with the snippet
+// for display. `kind` is optional and defaults to `"wiki"` for backwards
+// compatibility (pre-Sprint-6 callers never set it).
 export interface NoteLink {
-  // The raw wiki-link target (before `#`/`|`), trimmed.
+  // The raw target (before `#`/`|` for wiki, the destination path for
+  // Markdown), trimmed.
   readonly target: string;
-  // The heading anchor after `#`, or `null`. Captured but resolved to the file.
+  // The heading anchor after `#`, or `null`. Captured here; heading-line
+  // resolution is the consumer's concern (T-4.1c, Phase C).
   readonly heading: string | null;
   // 0-based line index of the link in the source note.
   readonly line: number;
   // The trimmed source line containing the link (for the tree label/tooltip).
   readonly snippet: string;
+  // Discriminator for the resolver path. Optional: `undefined` is treated as
+  // `"wiki"` (the pre-Sprint-6 shape).
+  readonly kind?: "wiki" | "markdown";
 }
 
 // A parsed source note: its stable path and the links it contains.
@@ -35,7 +56,11 @@ export interface ParsedNote {
   readonly links: ReadonlyArray<NoteLink>;
 }
 
-// A single backlink: a source note linking *to* the queried note.
+// A single backlink: a source note linking *to* the queried note. `kind` is
+// emitted on the returned object only for Markdown-link backlinks, so the
+// pre-Sprint-6 shape (`{ sourcePath, line, snippet, heading }`) is preserved
+// byte-for-byte for wiki-only inputs and every M4.1 / T-4.1b / M4.2 / M4.4
+// `assert.deepEqual` continues to pass without modification.
 export interface Backlink {
   // The path of the note that contains the link.
   readonly sourcePath: string;
@@ -45,6 +70,10 @@ export interface Backlink {
   readonly snippet: string;
   // The heading anchor the link targeted, or `null`.
   readonly heading: string | null;
+  // Discriminator. Present only when the source link was a Markdown link;
+  // omitted (not `undefined`) for wiki-link backlinks so deep-equal against
+  // the pre-Sprint-6 shape still holds.
+  readonly kind?: "wiki" | "markdown";
 }
 
 // A directed graph edge between two workspace notes (M4.4). `from` and `to` are
@@ -103,12 +132,16 @@ export function buildLinkIndex(notes: ReadonlyArray<ParsedNote>): LinkIndex {
 
   for (const note of notes) {
     for (const link of note.links) {
-      const targetPaths = resolveTarget(
-        note.path,
-        link.target,
-        canonicalByLowerPath,
-        pathsByBasename
-      );
+      const kind = link.kind ?? "wiki";
+      const targetPaths =
+        kind === "markdown"
+          ? resolveMarkdownTarget(note.path, link.target, canonicalByLowerPath)
+          : resolveTarget(
+              note.path,
+              link.target,
+              canonicalByLowerPath,
+              pathsByBasename
+            );
       for (const targetPath of targetPaths) {
         // A note never backlinks (or self-edges) to itself.
         if (targetPath.toLowerCase() === note.path.toLowerCase()) {
@@ -116,12 +149,23 @@ export function buildLinkIndex(notes: ReadonlyArray<ParsedNote>): LinkIndex {
         }
         const lowerTarget = targetPath.toLowerCase();
         const bucket = reverse.get(lowerTarget);
-        const backlink: Backlink = {
-          sourcePath: note.path,
-          line: link.line,
-          snippet: link.snippet,
-          heading: link.heading
-        };
+        // For Markdown links emit `kind` on the backlink. For wiki links omit
+        // it entirely so the pre-Sprint-6 deep-equal shape is unchanged.
+        const backlink: Backlink =
+          kind === "markdown"
+            ? {
+                sourcePath: note.path,
+                line: link.line,
+                snippet: link.snippet,
+                heading: link.heading,
+                kind: "markdown"
+              }
+            : {
+                sourcePath: note.path,
+                line: link.line,
+                snippet: link.snippet,
+                heading: link.heading
+              };
         if (bucket) {
           bucket.push(backlink);
         } else {
@@ -202,6 +246,27 @@ function resolveTarget(
   }
 
   return pathsByBasename.get(basenameKey(trimmed)) ?? [];
+}
+
+// Resolve a standard Markdown-link destination (as written in `sourcePath`)
+// to the note path it points at. **Explicit-path only — no basename fallback.**
+// Returns an empty array when the destination does not exist in the index.
+//
+// The destination has already been cleaned by `parseMarkdownTargets`: no URL
+// scheme, no leading `/`, no `?query`/`#anchor`, no `<…>` wrapping, and the
+// extension is `.md` or `.markdown`. This helper does the path arithmetic.
+function resolveMarkdownTarget(
+  sourcePath: string,
+  destination: string,
+  canonicalByLowerPath: Map<string, string>
+): string[] {
+  const trimmed = destination.trim();
+  if (trimmed.length === 0) {
+    return [];
+  }
+  const candidate = normalizePath(joinPath(dirname(sourcePath), trimmed));
+  const canonical = canonicalByLowerPath.get(candidate.toLowerCase());
+  return canonical ? [canonical] : [];
 }
 
 // The resolution key for a path or target: its last segment, with a trailing

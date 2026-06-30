@@ -79,7 +79,9 @@ export class BacklinksTreeProvider
       }`
     );
     item.resourceUri = element.sourceUri;
-    item.iconPath = new vscode.ThemeIcon("references");
+    item.iconPath = new vscode.ThemeIcon(
+      element.kind === "markdown" ? "link" : "symbol-reference"
+    );
     item.command = {
       command: BACKLINKS_COMMAND_IDS.open,
       title: "Open Source Note",

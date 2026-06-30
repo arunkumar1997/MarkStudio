@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { parseWikiTargets } from "./parseWikiTargets";
+import { parseMarkdownTargets } from "./parseMarkdownTargets";
 import {
   buildLinkIndex,
   type Backlink,
@@ -38,12 +39,16 @@ const REBUILD_DEBOUNCE_MS = 250;
 const SCAN_BATCH_SIZE = 24;
 
 // A resolved backlink with the source note's URI (for opening it) instead of
-// the pure index's path string.
+// the pure index's path string. `kind` carries the link kind through for the
+// Backlinks panel's icon vocabulary (ADR-0024); omitted for wiki-link
+// backlinks so the pre-Sprint-6 shape is preserved (consumers read `kind ??
+// "wiki"`).
 export interface ResolvedBacklink {
   readonly sourceUri: vscode.Uri;
   readonly line: number;
   readonly snippet: string;
   readonly heading: string | null;
+  readonly kind?: "wiki" | "markdown";
 }
 
 export class LinkIndexService implements vscode.Disposable {
@@ -97,12 +102,25 @@ export class LinkIndexService implements vscode.Disposable {
     for (const backlink of this.index.backlinksFor(this.pathOf(uri))) {
       const sourceUri = this.uriByPath.get(backlink.sourcePath);
       if (sourceUri) {
-        resolved.push({
-          sourceUri,
-          line: backlink.line,
-          snippet: backlink.snippet,
-          heading: backlink.heading
-        });
+        // Mirror the pure index's shape: emit `kind` only when present (i.e.
+        // Markdown-link backlinks) so the pre-Sprint-6 wiki-only shape is
+        // byte-for-byte preserved for existing assertions.
+        resolved.push(
+          backlink.kind === "markdown"
+            ? {
+                sourceUri,
+                line: backlink.line,
+                snippet: backlink.snippet,
+                heading: backlink.heading,
+                kind: "markdown"
+              }
+            : {
+                sourceUri,
+                line: backlink.line,
+                snippet: backlink.snippet,
+                heading: backlink.heading
+              }
+        );
       }
     }
     return resolved;
@@ -263,21 +281,42 @@ export class LinkIndexService implements vscode.Disposable {
   }
 }
 
-// Map the pure target list onto `NoteLink`s, attaching the trimmed source line
-// as the snippet. Kept here (not in the pure parser) so `parseWikiTargets`
-// stays a minimal target extractor.
+// Map the pure target lists onto `NoteLink`s, attaching the trimmed source
+// line as the snippet and tagging each link with its `kind`. Both extractors
+// are pure and order-independent (they each scan the full text in document
+// order, skipping the same regions — front matter, fences, inline code), so
+// merging is a concatenation; the reverse-index build pass is what produces
+// the stable output ordering downstream.
+//
+// `kind` is emitted on the returned `NoteLink` only for Markdown links; wiki
+// links omit it so the existing wiki-only fixtures continue to deep-equal
+// against the pre-Sprint-6 shape (ADR-0024 §"Decision" — additive widening).
 function extractLinks(text: string): NoteLink[] {
-  const targets = parseWikiTargets(text);
-  if (targets.length === 0) {
+  const wikiTargets = parseWikiTargets(text);
+  const markdownTargets = parseMarkdownTargets(text);
+  if (wikiTargets.length === 0 && markdownTargets.length === 0) {
     return [];
   }
   const lines = text.split(/\r\n|\r|\n/);
-  return targets.map<NoteLink>((target) => ({
-    target: target.target,
-    heading: target.heading,
-    line: target.line,
-    snippet: (lines[target.line] ?? "").trim()
-  }));
+  const out: NoteLink[] = [];
+  for (const target of wikiTargets) {
+    out.push({
+      target: target.target,
+      heading: target.heading,
+      line: target.line,
+      snippet: (lines[target.line] ?? "").trim()
+    });
+  }
+  for (const target of markdownTargets) {
+    out.push({
+      target: target.target,
+      heading: target.heading,
+      line: target.line,
+      snippet: (lines[target.line] ?? "").trim(),
+      kind: "markdown"
+    });
+  }
+  return out;
 }
 
 export type { Backlink };
