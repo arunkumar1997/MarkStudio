@@ -28,7 +28,7 @@ The foundational ADRs below (0001–0006) encode the non-negotiable rules from [
 | [0018](#adr-0018-wiki-links-as-a-dependency-free-markdown-it-inline-rule) | Wiki links as a dependency-free markdown-it inline rule | Accepted |
 | [0019](#adr-0019-footnotes--gfm-completeness-plugin-for-footnotes-built-ins--an-in-tree-rule-for-the-rest) | Footnotes & GFM completeness: plugin for footnotes, built-ins + an in-tree rule for the rest | Accepted |
 | [0020](#adr-0020-host-side-link-index-with-a-case-insensitive-basename-resolver-behind-a-filesystemwatcher) | Host-side link index with a case-insensitive basename resolver behind a `FileSystemWatcher` | Accepted |
-| [0021](#adr-0021-in-preview-wiki-link-navigation-via-a-shared-host-side-resolver-and-an-openwikilink-message) | In-preview wiki-link navigation via a shared host-side resolver and an `openWikiLink` message | Accepted (amended 2026-06-30) |
+| [0021](#adr-0021-in-preview-wiki-link-navigation-via-a-shared-host-side-resolver-and-an-openwikilink-message) | In-preview wiki-link navigation via a shared host-side resolver and an `openWikiLink` message | Accepted (amended 2026-06-30, extended 2026-06-30) |
 | [0022](#adr-0022-hover-preview-for-wiki-links-host-ships-markdown-text-webview-renders-it) | Hover preview for wiki-links: host ships Markdown text, webview renders it | Accepted |
 
 ---
@@ -983,10 +983,29 @@ Not a migration. New files under `src/links/`; `src/extension.ts` calls `registe
 ## ADR-0021: In-preview wiki-link navigation via a shared host-side resolver and an `openWikiLink` message
 
 ### Status
-`Accepted` — **amended 2026-06-30** (see [Amendment](#amendment-2026-06-30-targets-open-in-markstudio-with-a-webview-reveal-handshake)). The original decision opened `.md` targets in VS Code's built-in text editor; the amendment opens them in the MarkStudio custom editor instead.
+`Accepted` — **amended 2026-06-30** (see [Amendment](#amendment-2026-06-30-targets-open-in-markstudio-with-a-webview-reveal-handshake)) — **extended 2026-06-30** (see [Extension](#extension-2026-06-30-standard-markdown-links-open-in-markstudio-via-openmarkdownlink)). The original decision opened `.md` targets in VS Code's built-in text editor; the amendment opens them in the MarkStudio custom editor instead; the extension brings the same fix to standard markdown links (`[label](./Other.md)`) so any clickable `.md` reference in the preview routes through one shared open-in-MarkStudio path.
 
 ### Date
-2026-06-28 (amended 2026-06-30)
+2026-06-28 (amended 2026-06-30, extended 2026-06-30)
+
+### Extension (2026-06-30): standard markdown links open in MarkStudio via `openMarkdownLink`
+
+**Defect (continuation of PR #4).** The amendment above fixed wiki-link (`[[note]]`) and Backlinks navigation, but standard markdown links in the preview — `[Architecture Overview](./ARCHITECTURE.md)`, `[other](subdir/other.md)`, `[doc](/docs/x.md)`, with or without a `#heading` fragment — were still **not** intercepted. Clicking one fell through to the webview's default anchor behaviour, navigating the iframe to a useless `vscode-webview://…` URL. From the user's point of view this looked broken in exactly the same way the original ADR-0021 defect did, and contradicted the project philosophy a second time: MarkStudio *is* the Markdown experience, so a click on any `.md` reference must stay in it.
+
+**Revised decision (extension).** The webview mounts a **second** delegated `click` listener on the same persistent preview pane (`registerMarkdownLinkClicks` in `src/webview/preview/markdownLinkClick.ts`, mounted right after `registerWikiLinkClicks`). It claims a click on an `<a href>` only when the href passes a small, pure classifier (exported as `isExternalHref` / `parseLocalMarkdownHref` and unit-tested): the href must be non-empty, have no URL scheme (rejecting `http:`/`https:`/`mailto:`/`vscode:`/`command:`/`file:` …), not be a same-document `#fragment`, not carry `data-wikilink-target` (which the wiki-link handler owns), and resolve to a `.md` / `.markdown` extension after stripping any `?query` and `#fragment`. Modifier-held clicks (`ctrlKey`/`metaKey`/`shiftKey`/`altKey`) and clicks whose `defaultPrevented` is already set are left alone — the user (or an earlier handler) is asking for the default. Claimed clicks `preventDefault()` and post a new **`openMarkdownLink { href, target, heading }`** webview → host message (the second webview-originated navigation message). `href` is the raw attribute value (used only for the user-facing fallback message), `target` is the URL-decoded path part before `#`, and `heading` is the URL-decoded fragment or `null`.
+
+**Host resolution (extension).** A new `MarkStudioEditorProvider.openMarkdownLink(fromUri, href, target, heading)` runs **plain URI math** — *not* the workspace link index, which only knows about wiki-link basenames:
+
+* A `/`-prefixed `target` is workspace-absolute: it resolves against the source note's workspace folder (`vscode.workspace.getWorkspaceFolder(fromUri)`), falling back to the first workspace folder for an out-of-workspace source. Multi-root vaults therefore route the link to *the source's own root*, which is the only consistent interpretation when the same `/docs/x.md` could plausibly live in more than one folder.
+* Any other `target` is relative to the source's containing directory (`vscode.Uri.joinPath(fromUri, "..", target)`); `joinPath` normalises `..` segments.
+* A defence-in-depth scheme check rejects an external `href` or `target` even if a malformed message somehow reached the host.
+* Existence is the caller's `openTextDocument` — a broken link surfaces the same transient `MarkStudio: no note found at "<href>"` / `could not open note at "<href>"` status-bar fallback the wiki-link path uses, never a throw. Heading reveal reuses the existing `findHeadingLine` (miss → top of file); the open itself routes through the existing `openInMarkStudio`, so the **pending-reveal handshake is identical** to the wiki-link / backlinks paths.
+
+**Preserved.** No new dependency, setting, or command. The only protocol addition is the boundary-guarded `openMarkdownLink` message; no existing message changes shape. The wiki-link and Backlinks code paths are untouched. External URLs, image / PDF / TypeScript links, modifier-held clicks, and same-document `#fragment` links continue to use the webview's default behaviour — the handler is strictly opt-in, not a catch-all.
+
+**Compliance.** Upholds ADR-0002 (one delegated listener on the persistent preview pane; `postMessage`, never a reload), ADR-0001/0004 (resolution and editor navigation stay on the host through supported APIs), ADR-0005 (vanilla TypeScript, one new pure helper file), and ADR-0018/0020 (wiki-link rendering and resolution are unaffected). Strengthens consistency with ADR-0001's "MarkStudio is the editor for Markdown" by closing the last preview-anchor route that still dropped the user out of MarkStudio.
+
+**Tests.** Three Extension Host tests in `test/exthost/suite/navigation.test.ts` cover the host handler end-to-end (relative `.md` href, workspace-absolute `/path` href, external `https:` no-op — all assert the resulting tab is a `TabInputCustom` with `viewType === "markstudio.editor"`); a 13-test jsdom integration suite (`test/integration/markdownLinkClick.test.ts`) covers the click delegate's claim / leave-alone classification; the pure `isExternalHref` / `parseLocalMarkdownHref` helpers have 14 unit tests in `test/webview/markdownLinkClick.test.ts`; and the new `openMarkdownLink` boundary guard is unit-tested in `test/messaging/messages.test.ts` alongside the existing message guards. To make the host handler reachable from a host test, `activate()` now returns a small `MarkStudioExtensionApi { provider }` — not a contributed extension API, used only by the navigation tests.
 
 ### Amendment (2026-06-30): targets open in MarkStudio with a webview reveal handshake
 
