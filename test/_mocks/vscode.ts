@@ -121,5 +121,81 @@ export const workspace = {
     return new Disposable(() => {
       changeListeners = changeListeners.filter((l) => l !== listener);
     });
+  },
+
+  // Display-only utility — strips a leading workspace root marker so a unit
+  // test can assert tree-item tooltips against a stable, host-independent
+  // string. The real implementation is far more sophisticated; this is the
+  // minimum surface needed by `BacklinksTreeProvider`'s tooltip.
+  asRelativePath(uriOrPath: Uri | string): string {
+    const raw = typeof uriOrPath === "string" ? uriOrPath : uriOrPath.path;
+    return raw.replace(/^\/vault\//, "");
   }
 };
+
+// ─── Tree / theme surface (Phase D of Sprint 6 — for BacklinksTreeProvider) ─
+
+// VS Code's `Uri` is a complex class. The mock pins the narrow contract the
+// Backlinks panel relies on: a stable `path` string and a `toString()` that's
+// unique per instance. `file()` is the only factory the units under test use.
+export class Uri {
+  public readonly scheme = "file";
+  public constructor(public readonly path: string) {}
+  public static file(fsPath: string): Uri {
+    return new Uri(fsPath);
+  }
+  public toString(): string {
+    return `file://${this.path}`;
+  }
+}
+
+export enum TreeItemCollapsibleState {
+  None = 0,
+  Collapsed = 1,
+  Expanded = 2
+}
+
+export class TreeItem {
+  public description?: string;
+  public tooltip?: string | MarkdownString;
+  public resourceUri?: Uri;
+  public iconPath?: ThemeIcon;
+  public command?: {
+    command: string;
+    title: string;
+    arguments?: unknown[];
+  };
+  public constructor(
+    public readonly label: string,
+    public readonly collapsibleState: TreeItemCollapsibleState
+  ) {}
+}
+
+export class ThemeIcon {
+  public constructor(public readonly id: string) {}
+}
+
+export class MarkdownString {
+  public constructor(public readonly value: string) {}
+}
+
+// A minimal `EventEmitter` matching VS Code's contract closely enough for unit
+// tests: an `event` registration function returning a `Disposable`, a `fire`
+// method, and a `dispose` that drops all listeners.
+export class EventEmitter<T> {
+  private listeners: Array<(value: T) => void> = [];
+  public readonly event = (listener: (value: T) => void): Disposable => {
+    this.listeners.push(listener);
+    return new Disposable(() => {
+      this.listeners = this.listeners.filter((l) => l !== listener);
+    });
+  };
+  public fire(value: T): void {
+    for (const listener of [...this.listeners]) {
+      listener(value);
+    }
+  }
+  public dispose(): void {
+    this.listeners = [];
+  }
+}

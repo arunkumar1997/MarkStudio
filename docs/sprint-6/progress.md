@@ -22,11 +22,11 @@
 
 ## Verification (local)
 
-- `npm run lint` — ✅ clean as of Phase C
-- `npm run typecheck` — ✅ clean as of Phase C
-- `npm run typecheck:test` — ✅ clean as of Phase C
-- `npm run build` — ✅ clean as of Phase C
-- `npm test` — ✅ 306 unit + 65 integration (baseline 257 + 65 → +33 unit Phase B + +16 unit Phase C)
+- `npm run lint` — ✅ clean as of Phase D
+- `npm run typecheck` — ✅ clean as of Phase D
+- `npm run typecheck:test` — ✅ clean as of Phase D
+- `npm run build` — ✅ clean as of Phase D (no production-bundle delta from Phase D)
+- `npm test` — ✅ 316 unit + 65 integration (baseline 257 + 65 → +33 unit Phase B + +16 unit Phase C + +10 integration-style Phase D)
 - `npm run test:exthost` — ✅ 13 (unchanged — no new host surface)
 
 ## Commits
@@ -34,7 +34,8 @@
 * `2fb1537` — `docs(sprint-6): plan + progress tracker` — sprint plan + tracker landed on `feature/sprint-6`.
 * `c0c27d5` — `docs(sprint-6): ADR-0024 + design v2 section (Phase A)` — Phase A close-out.
 * `7eb1dcf` — `feat(links): Markdown-link backlinks (T-4.1a, Phase B)` — Phase B close-out.
-* _(Phase C finish)_ — `feat(links): heading-level backlinks (T-4.1c, Phase C)` — to be recorded after the commit.
+* `752a6ac` — `feat(links): heading-level backlinks (T-4.1c, Phase C)` — Phase C close-out.
+* _(Phase D finish)_ — `test(links): Backlinks tree pipeline coverage (Phase D)` — to be recorded after the commit.
 
 ## Bundle sizes (running)
 
