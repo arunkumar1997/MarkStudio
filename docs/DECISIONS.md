@@ -30,6 +30,9 @@ The foundational ADRs below (0001–0006) encode the non-negotiable rules from [
 | [0020](#adr-0020-host-side-link-index-with-a-case-insensitive-basename-resolver-behind-a-filesystemwatcher) | Host-side link index with a case-insensitive basename resolver behind a `FileSystemWatcher` | Accepted |
 | [0021](#adr-0021-in-preview-wiki-link-navigation-via-a-shared-host-side-resolver-and-an-openwikilink-message) | In-preview wiki-link navigation via a shared host-side resolver and an `openWikiLink` message | Accepted (amended 2026-06-30, extended 2026-06-30) |
 | [0022](#adr-0022-hover-preview-for-wiki-links-host-ships-markdown-text-webview-renders-it) | Hover preview for wiki-links: host ships Markdown text, webview renders it | Accepted |
+| [0023](#adr-0023-graph-view-host-side-pure-model--lazy-webview-canvas-zero-new-runtime-deps) | Graph view: host-side pure model + lazy webview canvas, zero new runtime deps | Accepted |
+| [0024](#adr-0024-markdown-link-backlinks-and-heading-level-promotion-via-additive-widening-of-the-link-index) | Markdown-link backlinks and heading-level promotion via additive widening of the link index | Accepted |
+| [0025](#adr-0025-templates-engine-in-tree-front-matter--variable-expansion-native-quickpick-zero-new-deps) | Templates engine: in-tree front-matter + variable expansion, native QuickPick, zero new deps | Accepted |
 
 ---
 
@@ -1284,3 +1287,79 @@ Not a migration. `parseMarkdownTargets` is new and additive; `linkIndex.ts` adds
 * [design/backlinks.md](design/backlinks.md) — v2 follow-ups section
 * [ROADMAP.md](ROADMAP.md) — Phase 4 (closed)
 * [TODO.md](TODO.md) — T-4.1a / T-4.1c
+
+---
+
+## ADR-0025: Templates engine: in-tree front-matter + variable expansion, native QuickPick, zero new deps
+
+### Status
+`Accepted`
+
+### Date
+2026-06-30
+
+### Context
+**M5.1 + M5.3** (Sprint 7) open **Phase 5 — Authoring Workflows** with the **Templates engine** and its first consumer, **Daily Notes**. A user needs to start a note from a reusable scaffold — a daily journal, a meeting note, a literature note — by expanding a small, predictable set of variables (date, title, slug, …), creating the file at a template-defined path, and opening it **in MarkStudio**. Daily Notes is the proof the engine generalises: "open today's note" is the engine resolving a configured template, expanding `{{date}}`, and create-or-opening the target — zero special-case logic.
+
+The infrastructure to mirror already exists: `LinkIndexService` (ADR-0020) established the pure-core + one-service-owns-the-I/O shape (async non-blocking scan, `FileSystemWatcher`, 250 ms debounced rebuild, an `onDidChange*` event), and PR #4 / the ADR-0021 amendments established that **any** new file-open path must route through `provider.openInMarkStudio` / `vscode.openWith` → `markstudio.editor`, never `showTextDocument` — otherwise a not-yet-open note lands in the built-in text editor.
+
+Four project-specific questions had to be settled: (1) whether to pull in libraries for templating (Handlebars / Mustache), YAML (`gray-matter`), and dates (`dayjs` / `date-fns`); (2) what the front-matter schema and the variable surface are; (3) how the two template roots (per-workspace, per-user) merge; and (4) the conflict policy when a template's output path already exists.
+
+### Decision
+1. **Zero new runtime dependencies — in-tree everything.** A ~30-line front-matter parser for a **fixed** `key: value` schema, an in-tree variable expander over a **closed allowlist**, and an in-tree date formatter built on `Intl.DateTimeFormat` parts. `gray-matter`, `dayjs`, `date-fns`, Handlebars, and Mustache are all rejected (ADR-0005). The variable set is ~16 closed tokens and the date format is a 5-token subset; both are a few dozen lines in-tree.
+2. **Pure core + one vscode-aware service, mirroring `LinkIndexService` (ADR-0020).** Four pure modules under `src/templates/` — `frontMatterParser.ts`, `variableExpander.ts`, `dateFormatter.ts`, `templateResolver.ts` — import nothing from `vscode` and are unit-testable directly. A single `TemplateService` owns the two `FileSystemWatcher`s, the async (not-awaited) scan, the 250 ms debounced rebuild, the `onDidChangeTemplates` event, and the `vscode.env.clipboard.readText()` shim. A thin `registerTemplates.ts` owns the three commands and the native QuickPick / InputBox flow.
+3. **Fixed front-matter schema; unknown keys round-trip.** Only `kind` (`"file"` default | `"snippet"`), `description`, `output` (required when `kind: file`), and `cursor` (optional 0-based line) are consumed. Unknown keys are kept verbatim in `meta.extras` for forward-compatibility but read by nothing this sprint. Malformed YAML → `meta = null`, `body = text`. **A template with no front-matter** is treated as `kind: file`, no `description`, `output: "{{filename}}.md"`. The parser supports exactly the fixed `key: value` subset (no nesting, no flow style, no block scalars) — anything richer is out of scope.
+4. **Closed variable allowlist; everything else passes through verbatim.** Curly (`{{date}}`, `{{time}}`, `{{datetime}}`, `{{title}}`, `{{slug}}`, `{{filename}}`, `{{cursor}}`) and dollar (`$CURRENT_YEAR`, `$CURRENT_MONTH`, `$CURRENT_DATE`, `$CURRENT_HOUR`, `$CURRENT_MINUTE`, `$TM_FILENAME`, `$TM_FILENAME_BASE`, `$WORKSPACE_NAME`, `$CLIPBOARD`) tokens are substituted; anything not on the list — including **snippet placeholders `${1}` / `${1:default}` / `${0}`** — is left intact, no error, no warning. Snippet placeholders must survive Sprint 7 untouched so Sprint 8's CodeMirror tab-stop path can consume them. `{{slug}}` is `kebab-case({{title}})`, deterministic.
+5. **Date formatter is `Intl.DateTimeFormat`-parts, `YYYY/MM/DD/HH/mm` only.** Any other character in the pattern passes through verbatim. Built on `Intl.DateTimeFormat` *parts* concatenated by token (never hand-rolled TZ math) so DST and multi-TZ machines stay correct; defaults to the runtime's effective timezone; tests pass a fixed `Date` so they are TZ-agnostic.
+6. **Two-root merge, workspace wins by basename.** Templates come from `<workspaceFolder>/.markstudio/templates/**/*.md` and `<globalStorageUri>/templates/**/*.md`. The pure `templateResolver` merges by **canonical basename** (case-insensitive — the same identity convention the link index uses for notes), **workspace wins**, stable sort by display name. Multi-root: workspace lookup walks `vscode.workspace.workspaceFolders` in order, **first-root-wins** (active-root-wins is a deferred refinement). User templates fill in any basename not present in any workspace folder.
+7. **No overwrite, ever — create-if-missing / open-if-exists.** When a template's expanded `output:` already exists, the engine opens the existing file and surfaces a status-bar info message `Template target exists — opening.` Daily Notes and `openExample` follow the identical rule.
+8. **Every file open routes through `vscode.openWith` → `markstudio.editor`.** Never `showTextDocument`. This is the PR #4 / ADR-0021 lesson applied to a new file-creation code path — a not-yet-open note must land in MarkStudio, not the built-in text editor.
+9. **No auto-bootstrap — empty state is a teaching opportunity.** When both roots resolve empty, the QuickPick shows a single non-selectable hint item pointing at `.markstudio/templates/` and the opt-in `MarkStudio: Create Example Template` command. The picker never silently dismisses. The folder is never created behind the user's back.
+10. **Native QuickPick / InputBox only — no webview, no protocol change, no new bundle.** The whole feature is host-side: no editor-webview change, no message-protocol change, no `esbuild.js` change. Title InputBox is always shown for `kind: file` (empty submission defaults `{{title}}` to the template basename). Daily Notes is one-key — no picker, no InputBox.
+11. **Three commands, five settings, no keybinding, no view, no Memento.** `markstudio.templates.create`, `markstudio.templates.openExample`, `markstudio.dailyNotes.openToday`; `templates.workspaceFolder` / `templates.userFolder` / `dailyNotes.template` / `dailyNotes.folder` / `dailyNotes.dateFormat`. No keybinding contribution (revisit only if F5 shows discoverability is a gap); no tree view; no Memento (template selection is one-shot).
+
+### Alternatives Considered
+1. **`gray-matter` for front-matter + `dayjs`/`date-fns` for dates + Handlebars/Mustache for templating.** Rejected: violates ADR-0005. The schema is a fixed `key: value` subset, the date format is 5 tokens, and the variable set is a closed allowlist — each is a few dozen lines in-tree with no library's surface area or supply-chain weight.
+2. **A template gallery / preview pane / editor webview.** Rejected at brainstorm: violates "no fake chrome / less UI is better / native beats custom." Users author templates as plain `.md` files; the picker is a native QuickPick.
+3. **Auto-bootstrap `.markstudio/templates/` on activation.** Rejected at brainstorm: an empty folder is a teaching opportunity, not a bug. `MarkStudio: Create Example Template` is the opt-in on-ramp.
+4. **Overwrite (or prompt to overwrite) on an output-path collision.** Rejected: silently destroying a user's note is the worst possible outcome; create-if-missing / open-if-exists is predictable and matches Daily Notes' natural behaviour.
+5. **`showTextDocument` for the new note.** Rejected: it opens the built-in text editor for a not-yet-open note — the exact PR #4 / ADR-0021 defect. `vscode.openWith` → `markstudio.editor` is the only correct path.
+6. **A full VS Code snippet grammar now** (`${1|a,b,c|}` choices, `${1/regex/replace/}` transforms, nested placeholders). Deferred: v1 recognises and passes through `${N}` placeholders; Sprint 8 (M5.2) owns the CodeMirror expansion path.
+7. **Active-root-wins multi-root precedence.** Deferred: first-root-wins is simpler to reason about and matches `findFiles` default ordering; revisit on a user signal.
+8. **Per-template keybindings / `/template-name` autocompletion / usage stats.** All deferred — not in scope for a v1 engine.
+9. **A `markstudio.templates.enabled` setting.** Rejected: the commands are the surface; nothing runs unless the user invokes one, so the default cost is zero.
+
+### Reasoning
+The `LinkIndexService` pattern (ADR-0020) was designed to be reused: a pure core behind a single I/O-owning service makes the genuinely testable pieces (parsing, expansion, formatting, precedence) unit-testable without booting VS Code, and confines all the watcher / scan / debounce machinery to one place. The variable set is small and *closed* on purpose — a template author can predict exactly what will be substituted, and the closed list is what lets snippet placeholders survive untouched into Sprint 8. Building the date formatter on `Intl.DateTimeFormat` parts avoids both a dependency and the classic hand-rolled-TZ bugs. Routing every open through `vscode.openWith` is non-negotiable: it is the single lesson PR #4 / ADR-0021 paid for, and the only path that keeps a freshly-created note in MarkStudio. No-overwrite and no-auto-bootstrap both choose the least-surprising, least-destructive behaviour, which is the right default for a tool that touches the user's files.
+
+### Consequences
+**Positive:** A first-party-feeling "new note from template" + "open today's note" workflow with **zero** new runtime dependencies, no webview change, no protocol change, and no new bundle. The pure modules are unit-testable in isolation; the service mirrors a proven shape. Daily Notes reuses the engine with no special logic. The engine already ships `kind: snippet` + `getTemplates("snippet")` so Sprint 8 only adds the CodeMirror expansion path. Host bundle grows by a small additive delta (target +6–10 kB); the editor webview is untouched.
+**Negative / Trade-offs:** The in-tree YAML parser supports only the fixed `key: value` subset — a template author who writes nested or flow-style YAML gets it dropped to `meta.extras` or `meta = null`. Snippet placeholders in a `kind: file` template land as literal `${1}` text (F5-verified; revisit in Sprint 8 if it surprises). First-root-wins can surprise a multi-root user whose active editor is not in workspace-folder index 0 (the QuickPick `detail` slot surfaces the source root to mitigate). Reference-style date tokens beyond `YYYY/MM/DD/HH/mm`, active-root precedence, template categories, per-template keybindings, and `$CLIPBOARD` failure dialogs are all deferred.
+**Neutral:** New `src/templates/` module (`frontMatterParser.ts`, `variableExpander.ts`, `dateFormatter.ts`, `templateResolver.ts`, `TemplateService.ts`) + `src/commands/registerTemplates.ts`; three new commands, five new settings, three new palette entries in `package.json`; one new line in `extension.ts`. No new dependency, no new view, no new keybinding, no new message, no `esbuild.js` change.
+
+### Compliance Impact
+No rule bent. Upholds ADR-0001 (the host reads/writes files and opens the custom editor via supported APIs), ADR-0002 (no webview recreation — the feature never touches the webview), ADR-0004 (reuses `createFileSystemWatcher` and VS Code's Configuration API; native QuickPick theming), ADR-0005 (vanilla TypeScript, zero new runtime dependencies, four pure modules), ADR-0006 (no new esbuild bundle), and ADR-0020 (mirrors the pure-core + one-I/O-service shape, one watcher pattern per root, async non-blocking scan). Applies the PR #4 / ADR-0021 amendment (open in MarkStudio via `vscode.openWith`, never `showTextDocument`) to a new file-creation path.
+
+### Migration Plan
+Not a migration. New files under `src/templates/` and `src/commands/registerTemplates.ts`; `src/extension.ts` constructs one `TemplateService` (pushed to `context.subscriptions`) and calls `registerTemplates(context, service)`; `package.json` contributes three commands, five settings, three palette entries. No existing behaviour changes; no message-protocol change; no stored-state migration.
+
+### Follow-Ups
+* **M5.2 Snippets** (Sprint 8) — CodeMirror tab-stop expansion of the `${N}` placeholders the engine already preserves.
+* **Full VS Code snippet grammar** — choices `${1|a,b,c|}`, transforms `${1/regex/replace/}`, nested placeholders.
+* **Active-root-wins** multi-root precedence, on a user signal.
+* **More date tokens** beyond `YYYY/MM/DD/HH/mm`, by extending the in-tree formatter.
+* **Template categories / nested-folder picker**, if the flat QuickPick grows unwieldy on a large vault.
+* **Per-template keybindings**, **`/template-name` autocompletion**, **usage stats** — deferred.
+* **M5.4 Workspace note features** — deferred until Sprint 7 + 8 adoption data exists.
+
+### References
+* [ADR-0001](#adr-0001-use-the-custom-editor-api)
+* [ADR-0002](#adr-0002-one-persistent-webview-retained-when-hidden)
+* [ADR-0004](#adr-0004-rely-on-vs-code-for-theming-autosave-and-file-watching)
+* [ADR-0005](#adr-0005-vanilla-typescripthtmlcss--no-frameworks)
+* [ADR-0006](#adr-0006-bundle-with-esbuild)
+* [ADR-0020](#adr-0020-host-side-link-index-with-a-case-insensitive-basename-resolver-behind-a-filesystemwatcher)
+* [ADR-0021](#adr-0021-in-preview-wiki-link-navigation-via-a-shared-host-side-resolver-and-an-openwikilink-message)
+* [design/templates.md](design/templates.md)
+* [ROADMAP.md](ROADMAP.md) — Phase 5 (M5.1 + M5.3)
+* [TODO.md](TODO.md) — M5.1 / M5.3

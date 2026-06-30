@@ -7,11 +7,11 @@
 
 ---
 
-## Status: 🟡 Phase A (design) — IN PROGRESS
+## Status: � Phase A (design) — COMPLETE · 🟡 Phase B (pure modules) — NEXT
 
 | # | Phase / Task | State | Owner | Notes |
 |---|---|---|---|---|
-| **A** | **Design + ADR-0025 + `design/templates.md`** | 🟡 In progress | Remy / Sage | This commit lands the sprint plan; ADR-0025 + design doc are Sage's first task before code |
+| **A** | **Design + ADR-0025 + `design/templates.md`** | ✅ Done | Remy / Sage | ADR-0025 appended to DECISIONS.md (+ index table fixed to include 0023/0024/0025); `docs/design/templates.md` written; plan + progress already on branch |
 | 1 | `frontMatterParser.ts` (pure) | ⬜ Not started | Sage | ~30 LOC, fixed schema, in-tree |
 | 2 | `variableExpander.ts` (pure) | ⬜ Not started | Sage | Allowlist closed; snippet `${N}` passes through |
 | 3 | `dateFormatter.ts` (pure) | ⬜ Not started | Sage | `YYYY/MM/DD/HH/mm` via `Intl.DateTimeFormat` parts |
