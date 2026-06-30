@@ -6,35 +6,47 @@
 
 ---
 
-## Status: 🟢 Phase B (host model + messaging) — DONE · 🟡 Phase C (webview panel) — NEXT
+## Status: 🟢 Phase C (panel + webview + esbuild) — DONE · 🟡 Phase D (more tests) — NEXT
 
 | # | Phase / Task | State | Owner | Notes |
 |---|---|---|---|---|
 | **A** | **Design + ADR-0023 + `design/graph-view.md`** | ✅ Done | Remy / Sage | Commit `526db18` |
-| 1 | `linkIndex.ts` — pure `allEdges()` (+ unit tests) | ✅ Done | Sage | +7 unit tests; edge dedup in same build pass |
-| 2 | `LinkIndexService.ts` — `getEdges()` / `getNotePaths()` / `uriFor(path)` / `pathFor(uri)` | ✅ Done | Sage | thin wrappers; no new state |
-| 3 | `graphModel.ts` (pure) — `buildGraph` + tests | ✅ Done | Sage | +18 unit tests; ASCII-codepoint sort for determinism |
-| 4 | `messages.ts` — `graphData` + `openGraphNode` + guards | ✅ Done | Sage | +9 unit tests; both messages boundary-guarded |
-| 5 | `GraphService.ts` — panel lifecycle, debounced post, `openGraphNode` handler | ⬜ Pending | Sage | depends on 2,3,4 |
-| 6 | `package.json` — `markstudio.graph.show` command | ⬜ Pending | Sage | depends on 5 |
-| 7 | `esbuild.js` — third bundle `dist/graph.js` | ⬜ Pending | Sage | depends on A |
-| 8 | `extension.ts` — wire `GraphService` | ⬜ Pending | Sage | depends on 5,6,7 |
-| 9 | `forceSimulation.ts` (pure) — Fruchterman–Reingold + tests | ⬜ Pending | Nova | depends on A |
-| 10 | `render.ts` — Canvas2D + DOM labels, theme cache | ⬜ Pending | Nova + Milo | depends on A |
-| 11 | `webview/graph/main.ts` — RAF, drag/zoom/pan/hover/click, merge-by-path | ⬜ Pending | Nova | depends on 4,9,10 |
-| 12 | Integration tests (jsdom): render seam, click→message | ⬜ Pending | Ivy | depends on 11 |
+| 1 | `linkIndex.ts` — pure `allEdges()` (+ unit tests) | ✅ Done | Sage | +7 unit tests |
+| 2 | `LinkIndexService.ts` — `getEdges()` / `getNotePaths()` / `uriFor(path)` / `pathFor(uri)` | ✅ Done | Sage | thin wrappers |
+| 3 | `graphModel.ts` (pure) — `buildGraph` + tests | ✅ Done | Sage | +18 unit tests; ASCII-codepoint sort |
+| 4 | `messages.ts` — `graphData` + `openGraphNode` + guards | ✅ Done | Sage | +9 unit tests |
+| 5 | `GraphService.ts` — panel lifecycle, debounced post, `openGraphNode` handler | ✅ Done | Sage | Commit `a804c8b`; routes through `provider.openInMarkStudio` |
+| 6 | `package.json` — `markstudio.graph.show` command | ✅ Done | Sage | category MarkStudio, codicon `type-hierarchy` |
+| 7 | `esbuild.js` — 4th lazy bundle `dist/graph.js` | ✅ Done | Sage | 19.3 kB; editor webview unchanged |
+| 8 | `extension.ts` — wire `GraphService` | ✅ Done | Sage | exposed on test API |
+| 9 | `forceSimulation.ts` (pure) — Fruchterman–Reingold | ✅ Done | Nova | _no unit tests yet (Phase D)_ |
+| 10 | `render.ts` — Canvas2D + DOM labels, theme cache | ✅ Done | Nova + Milo | live `--vscode-*` token sampling per frame |
+| 11 | `webview/graph/main.ts` — RAF, drag/zoom/pan/hover/click, merge-by-path | ✅ Done | Nova | seedPosition (FNV-1a), 1-hop neighbour highlight |
+| 12 | Unit tests for `forceSimulation` + integration tests (jsdom) | ⬜ Pending | Ivy | depends on 9,10,11 |
 | 13 | Exthost tests: `markstudio.graph.show` + `openGraphNode` routes through `openInMarkStudio` | ⬜ Pending | Ivy | depends on 5,8 |
 | 14 | Manual F5: small/medium/large vaults; theme matrix; perf budget | ⬜ Pending | Ivy + human | depends on all impl |
 | 15 | Docs pass + TODO M4.4 Done + ROADMAP Phase 4 close + QA sign-off | ⬜ Pending | Sage + Remy | depends on 14 |
 
 ## Verification (local)
-* `npm run lint` ✅ · `npm run typecheck` ✅ · `npm run typecheck:test` ✅ · `npm run build` ✅
-* `npm test` ✅ — **233 unit pass (was 199, +34) · 65 integration pass · 0 fail**
-* `npm run test:exthost` ⬜ (baseline: 9; target: 9+~2 after Phase C/D)
+
+- `npm run lint` ✅ · `npm run typecheck` ✅ · `npm run typecheck:test` ✅ · `npm run build` ✅
+- `npm test` ✅ — **233 unit pass · 65 integration pass · 0 fail**
+- `npm run test:exthost` ✅ — **9 pass · 0 fail** (Phase C did not regress activation)
 
 ## Commits
-* `526db18` — `docs(sprint-5): M4.4 graph view design + ADR-0023 (Phase A)`
-* _(pending)_ — `feat(graph): host-side graph model + LinkIndex.allEdges + messaging (Phase B, M4.4)`
+
+- `526db18` — `docs(sprint-5): M4.4 graph view design + ADR-0023 (Phase A)`
+- `8f1523e` — `feat(graph): host-side graph model + LinkIndex.allEdges + messaging (Phase B, M4.4)`
+- `a804c8b` — `feat(graph): GraphService panel + canvas webview + esbuild bundle (Phase C, M4.4)`
+
+## Bundle sizes after Phase C
+
+| Bundle | Size | Delta vs. main |
+|---|---|---|
+| `dist/extension.js` | 65.5 kB | +8 kB (GraphService + webviewHtml + graphModel) |
+| `dist/webview.js` | 2.0 MB | 0 (editor untouched) |
+| `dist/mermaid.js` | 7.5 MB | 0 |
+| `dist/graph.js` (new) | **19.3 kB** | new — lazy; users who never run the command download 0 bytes |
 
 ## Decisions log
 * 2026-06-30 — Producer: **zero new runtime dependencies**; hand-rolled force simulation + Canvas2D. d3-force / cytoscape.js / vis-network rejected in ADR-0023.
