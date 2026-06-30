@@ -334,3 +334,290 @@ describe("buildLinkIndex — allEdges (M4.4 graph)", () => {
     assert.deepEqual(index.allEdges(), []);
   });
 });
+
+// ---------------------------------------------------------------------------
+// T-4.1a: Markdown-link resolution (kind = "markdown").
+// ---------------------------------------------------------------------------
+
+describe("buildLinkIndex — Markdown-link resolution (T-4.1a)", () => {
+  it("resolves a relative ./note.md from notes/foo.md to notes/note.md", () => {
+    const index = buildLinkIndex([
+      {
+        path: "notes/foo.md",
+        links: [
+          {
+            target: "./note.md",
+            heading: null,
+            line: 0,
+            snippet: "see [n](./note.md)",
+            kind: "markdown"
+          }
+        ]
+      },
+      { path: "notes/note.md", links: [] }
+    ]);
+    const backlinks = index.backlinksFor("notes/note.md");
+    assert.equal(backlinks.length, 1);
+    assert.equal(backlinks[0].sourcePath, "notes/foo.md");
+    assert.equal(backlinks[0].kind, "markdown");
+  });
+
+  it("resolves a `..` parent destination", () => {
+    const index = buildLinkIndex([
+      {
+        path: "notes/sub/inner.md",
+        links: [
+          {
+            target: "../note.md",
+            heading: null,
+            line: 0,
+            snippet: "see [n](../note.md)",
+            kind: "markdown"
+          }
+        ]
+      },
+      { path: "notes/note.md", links: [] }
+    ]);
+    assert.equal(index.backlinksFor("notes/note.md").length, 1);
+  });
+
+  it("matches the target path case-insensitively (filesystem-friendly)", () => {
+    const index = buildLinkIndex([
+      {
+        path: "A.md",
+        links: [
+          {
+            target: "./guide.md",
+            heading: null,
+            line: 0,
+            snippet: "[g](./guide.md)",
+            kind: "markdown"
+          }
+        ]
+      },
+      { path: "Guide.md", links: [] }
+    ]);
+    assert.equal(index.backlinksFor("Guide.md").length, 1);
+  });
+
+  it("does NOT fall back to basename when the explicit path misses", () => {
+    // `[g](./Guide.md)` from `notes/foo.md` resolves to `notes/Guide.md`. If
+    // only `archive/Guide.md` exists, the link is dropped — *not* fuzzy-matched
+    // by basename like a wiki-link would be (ADR-0024 §"Decision").
+    const index = buildLinkIndex([
+      {
+        path: "notes/foo.md",
+        links: [
+          {
+            target: "./Guide.md",
+            heading: null,
+            line: 0,
+            snippet: "[g](./Guide.md)",
+            kind: "markdown"
+          }
+        ]
+      },
+      { path: "archive/Guide.md", links: [] }
+    ]);
+    assert.deepEqual(index.backlinksFor("archive/Guide.md"), []);
+  });
+
+  it("contributes a graph edge collapsed with wiki-link edges to the same pair", () => {
+    // A has a wiki-link `[[B]]` *and* a Markdown link `[b](./B.md)` to B.
+    // Both feed the same (A → B) edge; weight collapses across kinds.
+    const index = buildLinkIndex([
+      {
+        path: "A.md",
+        links: [
+          {
+            target: "B",
+            heading: null,
+            line: 0,
+            snippet: "[[B]]"
+            // no kind → wiki
+          },
+          {
+            target: "./B.md",
+            heading: null,
+            line: 1,
+            snippet: "[b](./B.md)",
+            kind: "markdown"
+          }
+        ]
+      },
+      { path: "B.md", links: [] }
+    ]);
+    const edges = index.allEdges();
+    assert.equal(edges.length, 1);
+    assert.equal(edges[0].weight, 2);
+  });
+
+  it("excludes a Markdown self-link (no self-edge in the graph)", () => {
+    const index = buildLinkIndex([
+      {
+        path: "notes/A.md",
+        links: [
+          {
+            target: "./A.md",
+            heading: null,
+            line: 0,
+            snippet: "[a](./A.md)",
+            kind: "markdown"
+          }
+        ]
+      }
+    ]);
+    assert.deepEqual(index.allEdges(), []);
+  });
+
+  it("preserves the wiki-link shape on the surfaced backlink (no kind field)", () => {
+    // The pre-Sprint-6 deep-equal expectation: a wiki-link backlink is
+    // `{ sourcePath, line, snippet, heading }` — `kind` must NOT appear.
+    const index = buildLinkIndex([
+      note("A.md", [{ target: "B" }]),
+      note("B.md", [])
+    ]);
+    assert.deepEqual(index.backlinksFor("B.md"), [
+      { sourcePath: "A.md", line: 0, snippet: "links to [[B]]", heading: null }
+    ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T-4.1c: heading-line promotion (`targetLine` on the surfaced backlink).
+// ---------------------------------------------------------------------------
+
+describe("buildLinkIndex — heading-line promotion (T-4.1c)", () => {
+  it("resolves a target heading to the 0-based line in the target note", () => {
+    const targetText = "# Title\n\nintro\n\n## Setup\n\nbody";
+    const index = buildLinkIndex([
+      note("A.md", [{ target: "B", heading: "Setup" }]),
+      { path: "B.md", text: targetText, links: [] }
+    ]);
+    const backlinks = index.backlinksFor("B.md");
+    assert.equal(backlinks.length, 1);
+    assert.equal(backlinks[0].heading, "Setup");
+    assert.equal(backlinks[0].targetLine, 4); // "## Setup" is line 4 (0-based)
+  });
+
+  it("returns targetLine: null when the heading is not in the target", () => {
+    const targetText = "# Title\n\n## Setup\n\nbody";
+    const index = buildLinkIndex([
+      note("A.md", [{ target: "B", heading: "MissingHeading" }]),
+      { path: "B.md", text: targetText, links: [] }
+    ]);
+    const backlinks = index.backlinksFor("B.md");
+    assert.equal(backlinks.length, 1);
+    assert.equal(backlinks[0].targetLine, null);
+  });
+
+  it("omits targetLine entirely when the link has no heading", () => {
+    // Pre-Sprint-6 wiki/no-heading backlinks must deep-equal against the
+    // exact `{ sourcePath, line, snippet, heading }` shape — no targetLine.
+    const targetText = "# Title\n\n## Setup\n\nbody";
+    const index = buildLinkIndex([
+      note("A.md", [{ target: "B" }]),
+      { path: "B.md", text: targetText, links: [] }
+    ]);
+    assert.deepEqual(index.backlinksFor("B.md"), [
+      { sourcePath: "A.md", line: 0, snippet: "links to [[B]]", heading: null }
+    ]);
+  });
+
+  it("omits targetLine when the target note has no text supplied", () => {
+    // Legacy fixtures that pre-date `ParsedNote.text` must continue to
+    // produce file-level backlinks (no heading-line promotion). The link
+    // still resolves to the file; only the heading promotion is skipped.
+    const index = buildLinkIndex([
+      note("A.md", [{ target: "B", heading: "Setup" }]),
+      note("B.md", []) // no `text`
+    ]);
+    const backlinks = index.backlinksFor("B.md");
+    assert.equal(backlinks.length, 1);
+    assert.equal(backlinks[0].heading, "Setup");
+    assert.equal(
+      "targetLine" in backlinks[0],
+      false,
+      "targetLine must be absent when target text is not supplied"
+    );
+  });
+
+  it("matches the heading case-insensitively", () => {
+    const targetText = "# Title\n\n## Setup\n\nbody";
+    const index = buildLinkIndex([
+      note("A.md", [{ target: "B", heading: "SETUP" }]),
+      { path: "B.md", text: targetText, links: [] }
+    ]);
+    assert.equal(index.backlinksFor("B.md")[0].targetLine, 2);
+  });
+
+  it("caches per (targetPath, heading) — many backlinks share one result", () => {
+    // Multiple notes link to the same target heading; they must all surface
+    // the same `targetLine`. (The cache itself is internal; this is the
+    // user-visible contract.)
+    const targetText = "# Title\n\n## API\n\nbody";
+    const index = buildLinkIndex([
+      note("A.md", [{ target: "T", heading: "API" }]),
+      note("B.md", [{ target: "T", heading: "API" }]),
+      note("C.md", [{ target: "T", heading: "API" }]),
+      { path: "T.md", text: targetText, links: [] }
+    ]);
+    const backlinks = index.backlinksFor("T.md");
+    assert.equal(backlinks.length, 3);
+    for (const b of backlinks) {
+      assert.equal(b.targetLine, 2);
+    }
+  });
+
+  it("resolves heading promotion independently per heading on the same target", () => {
+    const targetText = "# Title\n\n## Setup\n\nbody\n\n## Tear-down\n\ngone";
+    const index = buildLinkIndex([
+      note("A.md", [{ target: "T", heading: "Setup", line: 0 }]),
+      note("A.md".replace("A", "B"), [
+        { target: "T", heading: "Tear-down", line: 0 }
+      ]),
+      { path: "T.md", text: targetText, links: [] }
+    ]);
+    const backlinks = index.backlinksFor("T.md");
+    const byHeading = Object.fromEntries(
+      backlinks.map((b) => [b.heading, b.targetLine])
+    );
+    assert.equal(byHeading.Setup, 2);
+    assert.equal(byHeading["Tear-down"], 6);
+  });
+
+  it("promotes a Markdown-link heading too (kind = markdown carries through)", () => {
+    const targetText = "# Title\n\n## API\n\nbody";
+    const index = buildLinkIndex([
+      {
+        path: "src/Caller.md",
+        links: [
+          {
+            target: "./T.md",
+            heading: "API",
+            line: 0,
+            snippet: "[t](./T.md#API)",
+            kind: "markdown"
+          }
+        ]
+      },
+      { path: "src/T.md", text: targetText, links: [] }
+    ]);
+    const backlinks = index.backlinksFor("src/T.md");
+    assert.equal(backlinks.length, 1);
+    assert.equal(backlinks[0].kind, "markdown");
+    assert.equal(backlinks[0].heading, "API");
+    assert.equal(backlinks[0].targetLine, 2);
+  });
+
+  it("skips heading promotion inside fenced code in the target", () => {
+    // `findHeadingLine` already skips fences (it shares `parseHeadings`);
+    // this pins that the index inherits that behaviour for free.
+    const targetText = "# Title\n\n```\n## Fake\n```\n\nbody";
+    const index = buildLinkIndex([
+      note("A.md", [{ target: "T", heading: "Fake" }]),
+      { path: "T.md", text: targetText, links: [] }
+    ]);
+    assert.equal(index.backlinksFor("T.md")[0].targetLine, null);
+  });
+});

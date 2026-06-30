@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { parseWikiTargets } from "./parseWikiTargets";
+import { parseMarkdownTargets } from "./parseMarkdownTargets";
 import {
   buildLinkIndex,
   type Backlink,
@@ -38,12 +39,20 @@ const REBUILD_DEBOUNCE_MS = 250;
 const SCAN_BATCH_SIZE = 24;
 
 // A resolved backlink with the source note's URI (for opening it) instead of
-// the pure index's path string.
+// the pure index's path string. `kind` carries the link kind through for the
+// Backlinks panel's icon vocabulary (ADR-0024); omitted for wiki-link
+// backlinks so the pre-Sprint-6 shape is preserved (consumers read `kind ??
+// "wiki"`). `targetLine` is the 0-based line of the target heading in the
+// *target* note (T-4.1c) when the backlink's `heading` resolved, `null` when
+// the lookup ran but the heading was not found, and `undefined` when no
+// heading lookup applied. Consumers should read `targetLine ?? null`.
 export interface ResolvedBacklink {
   readonly sourceUri: vscode.Uri;
   readonly line: number;
   readonly snippet: string;
   readonly heading: string | null;
+  readonly kind?: "wiki" | "markdown";
+  readonly targetLine?: number | null;
 }
 
 export class LinkIndexService implements vscode.Disposable {
@@ -97,12 +106,31 @@ export class LinkIndexService implements vscode.Disposable {
     for (const backlink of this.index.backlinksFor(this.pathOf(uri))) {
       const sourceUri = this.uriByPath.get(backlink.sourcePath);
       if (sourceUri) {
-        resolved.push({
+        // Build the resolved record by hand so absent optional fields stay
+        // absent (not `undefined`) — the pre-Sprint-6 wiki/no-heading shape
+        // is byte-for-byte preserved when neither `kind` nor `targetLine`
+        // applies. The `Backlink` from the pure index already follows the
+        // same discipline, so we just thread fields through.
+        const out: {
+          sourceUri: vscode.Uri;
+          line: number;
+          snippet: string;
+          heading: string | null;
+          kind?: "wiki" | "markdown";
+          targetLine?: number | null;
+        } = {
           sourceUri,
           line: backlink.line,
           snippet: backlink.snippet,
           heading: backlink.heading
-        });
+        };
+        if (backlink.kind === "markdown") {
+          out.kind = "markdown";
+        }
+        if (backlink.targetLine !== undefined) {
+          out.targetLine = backlink.targetLine;
+        }
+        resolved.push(out);
       }
     }
     return resolved;
@@ -202,7 +230,10 @@ export class LinkIndexService implements vscode.Disposable {
   }
 
   // Read, parse, and cache a single file's links. Failures (e.g. a file deleted
-  // mid-scan) leave the note absent rather than aborting the scan.
+  // mid-scan) leave the note absent rather than aborting the scan. The note's
+  // full text is cached alongside its parsed links so the reverse-index build
+  // pass can resolve heading anchors in *target* notes (T-4.1c) without
+  // re-reading from disk.
   private async indexFile(uri: vscode.Uri): Promise<void> {
     let text: string;
     try {
@@ -213,7 +244,7 @@ export class LinkIndexService implements vscode.Disposable {
     }
     const path = this.pathOf(uri);
     this.uriByPath.set(path, uri);
-    this.notes.set(path, { path, links: extractLinks(text) });
+    this.notes.set(path, { path, text, links: extractLinks(text) });
   }
 
   private async onFileTouched(uri: vscode.Uri): Promise<void> {
@@ -263,21 +294,42 @@ export class LinkIndexService implements vscode.Disposable {
   }
 }
 
-// Map the pure target list onto `NoteLink`s, attaching the trimmed source line
-// as the snippet. Kept here (not in the pure parser) so `parseWikiTargets`
-// stays a minimal target extractor.
+// Map the pure target lists onto `NoteLink`s, attaching the trimmed source
+// line as the snippet and tagging each link with its `kind`. Both extractors
+// are pure and order-independent (they each scan the full text in document
+// order, skipping the same regions — front matter, fences, inline code), so
+// merging is a concatenation; the reverse-index build pass is what produces
+// the stable output ordering downstream.
+//
+// `kind` is emitted on the returned `NoteLink` only for Markdown links; wiki
+// links omit it so the existing wiki-only fixtures continue to deep-equal
+// against the pre-Sprint-6 shape (ADR-0024 §"Decision" — additive widening).
 function extractLinks(text: string): NoteLink[] {
-  const targets = parseWikiTargets(text);
-  if (targets.length === 0) {
+  const wikiTargets = parseWikiTargets(text);
+  const markdownTargets = parseMarkdownTargets(text);
+  if (wikiTargets.length === 0 && markdownTargets.length === 0) {
     return [];
   }
   const lines = text.split(/\r\n|\r|\n/);
-  return targets.map<NoteLink>((target) => ({
-    target: target.target,
-    heading: target.heading,
-    line: target.line,
-    snippet: (lines[target.line] ?? "").trim()
-  }));
+  const out: NoteLink[] = [];
+  for (const target of wikiTargets) {
+    out.push({
+      target: target.target,
+      heading: target.heading,
+      line: target.line,
+      snippet: (lines[target.line] ?? "").trim()
+    });
+  }
+  for (const target of markdownTargets) {
+    out.push({
+      target: target.target,
+      heading: target.heading,
+      line: target.line,
+      snippet: (lines[target.line] ?? "").trim(),
+      kind: "markdown"
+    });
+  }
+  return out;
 }
 
 export type { Backlink };

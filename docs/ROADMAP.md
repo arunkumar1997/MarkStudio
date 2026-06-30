@@ -90,7 +90,9 @@ The PKM layer — built on the unshakeable core delivered in Phases 0–3.
 **Milestones**
 
 - M4.1 — Backlinks panel _(Done — T-4.1; native `MarkStudio Backlinks` tree view over a host-side, async, watcher-backed link index; lands the wiki-link resolver deferred from Phase 3, ADR-0020)_
+  - T-4.1a — Markdown-link backlinks _(Done — Sprint 6; standard `[label](./other.md)` links now produce backlinks too, alongside the wiki-link entries, with `$(link)` vs `$(symbol-reference)` icons; explicit-path resolution only, ADR-0024)_
   - T-4.1b — In-preview wiki-link navigation _(Done; clicking `[[note]]` in the preview opens the target via the shared M4.1 resolver, ADR-0021)_
+  - T-4.1c — Heading-level backlinks _(Done — Sprint 6; a `#heading` anchor on a wiki or Markdown link is promoted to the target heading's line in the Backlinks panel description / tooltip; per-build heading-line cache reuses the existing `findHeadingLine`, ADR-0024)_
 - M4.2 — Hover preview for links _(Done — M4.2; hovering `[[note]]` / `[[note#heading]]` in the preview shows a floating card previewing the target, ADR-0022)_
 - M4.4 — Graph view _(Done — Sprint 5; interactive workspace-wide note⇄wiki-link topology in a free-standing webview panel, hand-rolled Fruchterman–Reingold + Canvas2D + DOM-label render, zero new runtime deps, ADR-0023)_
 - _M4.3 — Transclusion: dropped from scope on 2026-06-30 (Producer decision)._

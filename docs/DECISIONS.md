@@ -1211,3 +1211,76 @@ Not a migration. `extension.ts` constructs a `GraphService` alongside `registerB
 * [api/message-protocol.md](api/message-protocol.md) — `graphData` / `openGraphNode` (added in Phase E)
 * [ROADMAP.md](ROADMAP.md) — Phase 4
 * [TODO.md](TODO.md) — M4.4
+
+---
+
+## ADR-0024: Markdown-link backlinks and heading-level promotion via additive widening of the link index
+
+### Status
+`Accepted`
+
+### Date
+2026-06-30
+
+### Context
+Sprint 6 closes the two Phase 4 carry-overs ADR-0020 explicitly deferred:
+
+* **T-4.1a — Markdown-link backlinks.** Standard Markdown links (`[text](./note.md)`, `[text](note.md#heading)`) must feed the same backlinks index that wiki-links (ADR-0020) already feed, so the Backlinks panel surfaces both kinds and the Graph view (ADR-0023) picks them up for free through `LinkIndex.allEdges()`.
+* **T-4.1c — Heading-level backlinks.** A link targeting `#heading` is currently captured but collapsed to the file in `LinkIndex`; it must be **promoted** to a per-target heading line so the Backlinks panel can surface the target heading next to each linking line.
+
+Three questions had to be settled: (1) how Markdown-link resolution differs from the wiki-link resolver's basename-with-relative-first rule (ADR-0020) — Markdown links are author-explicit paths, not bare names; (2) whether to introduce a second `NoteLink` type / second index / second parser, or **widen** the existing one; and (3) where heading-level granularity lives, given ADR-0023 keeps the Graph view at note-level on purpose.
+
+ADR-0020 followed a deliberate pattern: a pure target extractor (`parseWikiTargets`) feeding a pure reverse-index + resolver (`linkIndex`), with one I/O service (`LinkIndexService`) owning the watcher and async scan. The widening must preserve that shape — every existing M4.1 / T-4.1b / M4.2 / M4.4 test must still pass without modification.
+
+### Decision
+1. **Markdown-link resolution is explicit-path only — no basename fallback.** Wiki-links use case-insensitive basename matching because `[[Guide]]` is a name reference; standard Markdown links are author-explicit paths and resolve only relative to the source note's directory (or `joinPath(dirname(sourcePath), destination)` after stripping any `?query` / `#anchor` and unwrapping `<…>`). A destination that is an absolute URL (`scheme:` prefix), starts with `//`, is a bare `#fragment`, or is empty is skipped. A leading `/` (workspace-absolute) is **skipped in v1** — its meaning is ambiguous in multi-root workspaces, deferring to a follow-up. Reference-style links (`[text][id]` + `[id]: ./note.md`) and bare-anchor links are skipped in v1. If the resolved path does not exist in the index, the link is dropped (no basename fallback).
+2. **Widen `NoteLink`, do not split it.** `NoteLink` gains `kind: "wiki" | "markdown"`. Both parsers (`parseWikiTargets`, new pure `parseMarkdownTargets`) emit the same shape and `LinkIndexService.indexFile` merges them into one tagged `NoteLink[]`. `Backlink` gains `kind` and an optional `targetLine: number | null`. `GraphEdge` is unchanged — edge weight collapses across both kinds (per-kind split is a deferred follow-up). The pre-Sprint-6 backlink build loop, ordering rules, dedupe key, and self-link policy are **untouched**; the widening is strictly additive.
+3. **Markdown-link parser mirrors the wiki-link parser.** A new pure `src/links/parseMarkdownTargets.ts` reuses the wiki-link parser's front-matter / fenced-code / inline-code skipping; it scans for `[text](destination)` (including titled `[text](dest "title")` and angle-bracket `[text](<dest>)`) and emits a `{ target, heading, line, snippet }` for each link whose destination is a relative `.md`/`.markdown` path. Reference-style and bare-anchor links are skipped here so the resolver never sees them. The two parsers stay textually parallel so a future maintenance pass on either reads as one diff against the other.
+4. **Heading-line promotion is computed once per (target, heading) pair per build.** The reverse-index build pass keeps an in-closure `Map<targetPath + "\\u0000" + heading, number | null>` cache: the first backlink to a given target heading runs `findHeadingLine(targetText, heading)` (`src/outline/headings.ts`, the same scanner M4.2 and T-4.1b use); every later backlink to the same heading hits the cache. Cache lives in the `buildLinkIndex` closure, **not** on the service, so each watcher-driven rebuild rebuilds the cache and can never serve stale heading lines. Heading misses set `targetLine: null` and the backlink remains at the file level (matches the M4.2 hover-preview policy: unresolved heading → top-of-note).
+5. **Heading-level granularity lives in the index and the Backlinks panel only.** The Graph view (ADR-0023) stays note-level; edges carry the heading anchor in source data, but the renderer does not split a node per heading. The Backlinks panel surfaces `targetLine` only as a tree-item description suffix (`→ <heading>`) and as a tooltip target-line; the panel stays flat (one entry per linking line — no new grouping mode in v1).
+6. **Heading-line resolution needs the target note's text.** `buildLinkIndex` is fed `ParsedNote { path, text, links }` (text added, the rest unchanged) so the build pass can call `findHeadingLine(targetText, heading)` without re-reading from disk. `LinkIndexService.indexFile` already has the text in hand; passing it through is one new field on `ParsedNote`, no new I/O.
+7. **Zero new runtime dependencies, settings, commands, messages, watchers, or scans.** The Markdown extractor and the heading-line resolver are pure. No protocol change. The Backlinks tree-item icon vocabulary (`$(symbol-reference)` for wiki, `$(link)` for Markdown) reuses Codicons already loaded.
+8. **The Graph view picks up Markdown-link edges automatically.** It already iterates `LinkIndex.allEdges()`; once both extractors feed the same builder, Markdown-link edges appear in `allEdges()` deduped and weight-summed with their wiki-link counterparts. **No graph-view code change.**
+
+### Alternatives Considered
+1. **Basename fallback for Markdown links** (e.g. `[guide](./Guide.md)` falls back to any `Guide.md` if the relative path misses). Rejected: Markdown links are explicit paths; fuzzy matching is the wiki-link affordance. A miss should be a miss so the author notices a broken link rather than silently routing through the wrong file.
+2. **Split `NoteLink` into `WikiNoteLink` and `MarkdownNoteLink` with separate buckets.** Rejected by Producer policy: every existing M4.1 / T-4.1b / M4.2 / M4.4 test would have to be updated to thread the new types through. Adding one tag field is the minimum-blast-radius change and preserves the proven shape.
+3. **Per-target asynchronous heading-line resolution** (after the build pass, in a follow-up tick). Rejected: the heading line is needed at panel-refresh time; computing it during the build pass under a small cache is simpler than two-phase refresh.
+4. **Add a setting `markstudio.backlinks.headingLevel` or `markstudio.backlinks.markdownLinks`.** Rejected: the feature is additive and has no downside when on. Settings are configuration debt; defer until a user signal justifies one.
+5. **Heading-level *nodes* in the Graph view** (one node per heading). Rejected for v1: explodes the node count, breaks layout determinism, and conflates this sprint with a graph redesign. ADR-0023 keeps the graph note-level.
+6. **Per-kind edge weight split in the Graph view.** Deferred: edge weight collapses across both kinds; a single ordered pair gets one edge with weight summed. Per-kind rendering is a follow-up if a user signal justifies the visual complexity.
+7. **Reference-style Markdown link indexing.** Deferred: would require a two-pass resolver (`[text][id]` plus `[id]: …`). Out of scope for v1 — most note-style writing uses inline links.
+8. **Workspace-absolute Markdown links (`/docs/x.md`).** Deferred to a future sprint that has a multi-root strategy. v1 skips them rather than guess the root.
+9. **Hover preview on standard Markdown links.** Deferred: the M4.2 hover path is wiki-link only and the preview's standard Markdown links already work via VS Code's default open behaviour. Adding a second delegated hover listener with its own security review is its own sprint.
+
+### Reasoning
+The ADR-0020 architecture was designed to accept exactly this widening: keeping the parser, the builder, and the resolver pure made adding a second extractor a *parallel* file rather than a refactor. Adding `kind` to `NoteLink` and `targetLine` to `Backlink` is a strictly additive widening — every existing test that does not look at `kind` or `targetLine` keeps passing untouched. Explicit-path resolution for Markdown links matches author intent (Markdown links are paths, not names) and avoids reintroducing the basename-collision risk in a multi-root vault for a syntax that already has no such convention. Computing heading lines in a per-build closure cache is the smallest possible reduction in `findHeadingLine` calls (O(distinct (target, heading) pairs) instead of O(backlinks)) without adding service-level state that could go stale. Keeping heading-level granularity confined to the index + Backlinks panel honours ADR-0023's "graph is note-level by design" without forcing a redesign of the graph data model.
+
+### Consequences
+**Positive:** Markdown-link backlinks and heading-level resolution land on **one** shared infrastructure with **zero** new runtime dependencies, settings, commands, messages, watchers, or scans. The Graph view picks up Markdown-link edges for free. The widening is additive — every M4.1 / T-4.1b / M4.2 / M4.4 test passes without modification. Closes Phase 4 with **no open follow-ups**.
+**Negative / Trade-offs:** A Markdown link with a typo in the path is silently dropped (no panel entry) — author-explicit paths means a miss is the right signal. Reference-style links, bare-anchor links, and workspace-absolute (`/`-prefixed) Markdown links are not indexed in v1 — tracked deferrals. Edge weight collapses across both kinds in the Graph view, so a vault where two notes link via both kinds renders a single heavier edge with no per-kind breakdown. The heading-line cache is per-build; a build that touches a target's headings invalidates them naturally on the next rebuild, but a never-touched target's headings stay cached for the lifetime of the build, which is correct but worth noting.
+**Neutral:** New pure `src/links/parseMarkdownTargets.ts`; `NoteLink.kind`, `Backlink.kind`, `Backlink.targetLine` added; `ParsedNote.text` added; `BacklinksTreeProvider` gains kind-aware icons + heading description + tooltip target-line. No new file outside `src/links/`.
+
+### Compliance Impact
+No rule bent. Upholds ADR-0005 (zero new dependencies), ADR-0008 (markdown-it / preview rendering untouched), ADR-0020 (one shared link index, one watcher, one async scan — additive widening of the same pure shape), ADR-0021/0022 (resolver remains the single source of truth for wiki-link navigation and hover preview), and ADR-0023 (the Graph view consumes `allEdges()` unchanged; heading granularity stays out of the graph by design). Realises the two carry-over follow-ups ADR-0020 §"Follow-Ups" listed.
+
+### Migration Plan
+Not a migration. `parseMarkdownTargets` is new and additive; `linkIndex.ts` adds `kind` to `NoteLink`, `kind` + `targetLine` to `Backlink`, and `text` to `ParsedNote`; `LinkIndexService.indexFile` runs both extractors and passes note text through; `BacklinksTreeProvider` renders the new fields. No protocol change, no setting, no command. Existing fixtures (wiki-only) round-trip unchanged.
+
+### Follow-Ups
+* Reference-style Markdown links (`[text][id]` + `[id]: ./note.md`) — two-pass resolver.
+* Workspace-absolute (`/`-prefixed) Markdown link indexing, once a multi-root strategy lands.
+* Per-kind edge weight split in the Graph view, if a user signal justifies the visual complexity.
+* Hover preview on standard Markdown links (second delegated listener, its own security review).
+* A Backlinks "group by target heading" view-mode, if heading-level visibility-as-suffix proves insufficient.
+* Slug-based heading matching (shared with the outline) so headings containing inline Markdown (`## **Bold**`) resolve.
+
+### References
+* [ADR-0005](#adr-0005-vanilla-typescripthtmlcss--no-frameworks)
+* [ADR-0020](#adr-0020-host-side-link-index-with-a-case-insensitive-basename-resolver-behind-a-filesystemwatcher)
+* [ADR-0021](#adr-0021-in-preview-wiki-link-navigation-via-a-shared-host-side-resolver-and-an-openwikilink-message)
+* [ADR-0022](#adr-0022-hover-preview-for-wiki-links-host-ships-markdown-text-webview-renders-it)
+* [ADR-0023](#adr-0023-graph-view-host-side-pure-model--lazy-webview-canvas-zero-new-runtime-deps)
+* [design/backlinks.md](design/backlinks.md) — v2 follow-ups section
+* [ROADMAP.md](ROADMAP.md) — Phase 4 (closed)
+* [TODO.md](TODO.md) — T-4.1a / T-4.1c
