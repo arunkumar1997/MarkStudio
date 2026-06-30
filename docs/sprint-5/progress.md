@@ -6,7 +6,7 @@
 
 ---
 
-## Status: 🟢 Phase D (tests) — DONE · 🟡 Phase E (docs) — NEXT
+## Status: 🟢 Phase D (tests) — DONE · 🟢 Phase E (docs) — DONE · ready for push + PR + Producer `--no-ff` merge
 
 | # | Phase / Task | State | Owner | Notes |
 |---|---|---|---|---|
@@ -25,7 +25,7 @@
 | 12 | Unit tests: `forceSimulation` (13) + boundary guard (11) | ✅ Done | Ivy | Phase D |
 | 13 | Exthost tests: command registration, idempotency, `handleOpenGraphNode` routing, unknown-path | ✅ Done | Ivy | +4 exthost tests; F5 manual sanity passed |
 | 14 | Manual F5: small/medium/large vaults; theme matrix; perf budget | 🟡 Partial | human | Initial F5 sanity passed; full vault + theme matrix sweep is part of Phase F QA |
-| 15 | Docs pass + TODO M4.4 Done + ROADMAP Phase 4 close + QA sign-off | ⬜ Pending | Sage + Remy | Phase E |
+| 15 | Docs pass + TODO M4.4 Done + ROADMAP Phase 4 close + QA sign-off | ✅ Done | Sage + Remy | Phase E |
 
 ## Verification (local)
 

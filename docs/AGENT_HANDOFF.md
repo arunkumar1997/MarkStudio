@@ -1,4 +1,4 @@
-# AGENT HANDOFF — PR #4 merged: wiki-link / Backlinks / standard markdown links open in MarkStudio (2026-06-30)
+# AGENT HANDOFF — Sprint 5 / M4.4 Graph view shipped on `feature/sprint-5` (2026-06-30)
 
 > Overwrite this file at the end of every working session; do not append. The previous handoff is preserved in git history. Template: [.ai/TEMPLATES/HANDOFF.md](../.ai/TEMPLATES/HANDOFF.md).
 >
@@ -9,49 +9,58 @@
 ## Session Metadata
 
 * **Date:** 2026-06-30
-* **Agent / Author:** Remy (Producer) — merge + post-merge docs sync
-* **Working branch:** `main` (merged from `fix/wikilink-open-in-markstudio`)
-* **Last commit on `main`:** `dee909e` *(`--no-ff` merge of `fix/wikilink-open-in-markstudio` / PR #4)*
-* **Branch state:** PR #4 merged to `main` via `--no-ff` (repo convention; never squash/rebase). The four feature commits on the branch are preserved in history: `dc8cda2` fix (wiki-link + backlinks) + `0b11632` docs + `d11e2ac` fix (standard markdown links) + `807105a` docs.
-* **Prompt used:** ai-team-orchestration (Producer close-out)
+* **Agent / Author:** Remy (Producer) — Sprint 5 close-out (Phases A → E)
+* **Working branch:** `feature/sprint-5` (off `main` `dee909e`)
+* **Last commit on branch:** `d1c7069` *(test(graph): forceSimulation + boundary guard + exthost coverage — Phase D)*. Branch is **6 commits ahead** of `main`, plus the Phase E docs commit that will follow this handoff write.
+* **Prompt used:** ai-team-orchestration (Producer + Dev team — Sage host + Nova webview + Ivy tests)
 
 ---
 
 ## 1. What Was Completed
 
-**Bugfix merged: clicking a `.md` target from the preview or the Backlinks panel now opens MarkStudio, not VS Code's built-in text editor.** Root cause was that `vscode.window.showTextDocument(...)` does not route to a custom editor registered at `priority: "option"` (the deliberate ADR-0021 / ADR-0020 choice). The fix is a small **pending-reveal handshake** built around `vscode.commands.executeCommand("vscode.openWith", uri, MarkStudioEditorProvider.viewType)`, applied uniformly to **three** navigation paths:
+**Sprint 5 — M4.4 Graph view shipped on `feature/sprint-5` (pending PR + `--no-ff` merge to `main`). This closes Phase 4 — Knowledge Management.**
 
-1. **Wiki-link clicks in the preview** — `[[note]]` / `[[note|alias]]` / `[[note#heading]]` (T-4.1b path).
-2. **Backlinks panel rows** — `markstudio.backlinks.open` (T-4.1 path).
-3. **Standard markdown links in the preview** (new in this PR's second commit pair) — `[Architecture Overview](./ARCHITECTURE.md)`, `[doc](/docs/x.md)`, with or without a `#heading` fragment.
+A new **`MarkStudio: Show Graph`** command (`markstudio.graph.show`, also surfaced as an editor title-bar action with the `$(type-hierarchy)` icon while a MarkStudio editor is active) opens an interactive workspace-wide graph of every workspace note (circle) and every wiki-link (edge): pan, wheel-zoom around the cursor, drag-pin, hover → 1-hop neighbour highlight, click to open the target **in MarkStudio**, Escape resets the view.
 
 **Architecture.**
 
-* **`src/editor/pendingReveals.ts` (new, pure).** Tiny `Map<string, number>` wrapper (`set` / `take` / `clear`) keyed by `uri.toString()` that parks a requested 0-based reveal line for a target that is not yet open. No `vscode`/DOM imports → unit-testable.
-* **`src/editor/MarkStudioEditorProvider.ts`.** New `controllersByUri: Map<string, MarkStudioEditorController>` alongside the existing single-`activeController` focus tracking, plus a `PendingReveals` instance. New **public** `openInMarkStudio(targetUri, line)` is the single shared entry point for all three call sites: already-open target → `openWith` focuses its tab + `revealLine` immediately on the live controller; not-yet-open target → record the line in `pendingReveals` **before** `openWith`, applied by `applyPendingReveal(uri)` in the `ready` handler. Disposal removes the entry from `controllersByUri` and clears any stale pending reveal.
-* **`src/links/registerBacklinks.ts`.** `markstudio.backlinks.open` now calls `provider.openInMarkStudio(uri, safeLine)` (try/catch → transient status-bar fallback, fire-and-forget).
-* **`src/webview/preview/markdownLinkClick.ts` (new).** A second delegated `click` listener on the persistent preview pane, mounted next to `registerWikiLinkClicks` and strictly disjoint from it (skips anchors carrying `data-wikilink-target`). Two pure helpers (`isExternalHref`, `parseLocalMarkdownHref`) classify the href; the listener claims a click only when it is non-empty, has no URL scheme (rejecting `http:`/`https:`/`mailto:`/`vscode:`/`command:`/`file:`…), is not a same-document `#fragment`, no modifier key is held (`ctrlKey`/`metaKey`/`shiftKey`/`altKey`), the click's default is not already prevented, and the path ends in `.md` / `.markdown` after stripping any `?query` and `#fragment`. Claimed clicks `preventDefault()` and post a new typed **`openMarkdownLink { href, target, heading }`** webview → host message.
-* **`src/messaging/messages.ts`.** Added `OpenMarkdownLinkMessage` to the `WebviewToHostMessage` union with a boundary guard case (`isWebviewToHostMessage`).
-* **`src/extension.ts`.** `activate()` now returns a tiny `MarkStudioExtensionApi { provider }` purely so the Extension Host tests can drive `provider.openMarkdownLink` directly.
-* **Host handler `MarkStudioEditorProvider.openMarkdownLink(fromUri, href, target, heading)`.** Defence-in-depth `EXTERNAL_HREF` regex check (rejects schemed hrefs even if the webview slips one through), resolves via `resolveMarkdownLinkUri` — **plain URI math, not the workspace link index** (which only knows wiki-link basenames): a `/`-prefixed `target` is workspace-absolute (resolved against the source note's workspace folder, falling back to the first folder for an out-of-workspace source — multi-root vaults always route to *the source's own root*); any other `target` is relative to the source's containing directory (`vscode.Uri.joinPath(fromUri, "..", target)`). Then reads the target doc, finds the heading via `findHeadingLine` (miss → top), clamps the line, and routes through `openInMarkStudio` so the pending-reveal handshake is identical to the wiki-link / backlinks paths. Try/catch → transient status-bar fallback (`MarkStudio: no note found at "<href>"` / `could not open note at "<href>"`, 4000 ms), never a throw.
+* **`src/links/linkIndex.ts`** — new `GraphEdge` type + **pure** `allEdges()` getter; (from, to) dedup with weight summed in the same build pass; deterministic ASCII-codepoint key (Phase-B bug caught: `localeCompare` is locale-dependent — switched to `(a < b ? -1 : a > b ? 1 : 0)`).
+* **`src/links/LinkIndexService.ts`** — four new thin getters: `getNotePaths()`, `getEdges()`, `uriFor(path)`, `pathFor(uri)`. Used only by `GraphService`; the backlinks panel + click-nav path is untouched.
+* **`src/graph/graphModel.ts` (new, pure).** `buildGraph(paths, edges, currentPath) → Graph`: deterministic ASCII sort, defensive self-edge + unknown-endpoint drops, weight ≤ 0 → 1.
+* **`src/graph/GraphService.ts` (new).** Owns the single `vscode.WebviewPanel` (`retainContextWhenHidden: true`). Subscribes to `LinkIndexService.onDidChangeIndex` (debounced 250 ms) and `provider.onDidChangeActiveDocument` (immediate); posts `graphData` over the boundary-guarded `MessageBus`. Handles `openGraphNode { path }` by routing through `provider.openInMarkStudio(uri, 0)` — **the PR #4 pending-reveal handshake**, never `showTextDocument`. `coerceWebviewToHostMessage` is exported so the boundary-guard test suite can hit it directly.
+* **`src/graph/webviewHtml.ts` (new).** Strict-CSP HTML scaffold (`script-src 'nonce-…'`, `style-src 'unsafe-inline'` for `--vscode-*` token use, no `connect-src`).
+* **`src/messaging/messages.ts`.** New `GraphDataMessage` (H → W) + `OpenGraphNodeMessage` (W → H); both added to the unions and the boundary guards.
+* **`src/extension.ts`.** Wired `GraphService`; exposed on the `MarkStudioExtensionApi` for exthost tests.
+* **`package.json`.** `markstudio.graph.show` command + editor title-bar entry under `menus.editor/title`, `group: navigation@99`, `when: activeCustomEditorId == 'markstudio.editor'`.
+* **`src/webview/graph/forceSimulation.ts` (new, pure).** Hand-rolled 2D Fruchterman–Reingold: repulsion + Hookean spring + centre gravity + damping + per-step displacement cap. Deterministic FNV-1a `seedPosition` — no `Math.random`. Kinetic-energy stopping criterion; RAF self-stops when settled.
+* **`src/webview/graph/render.ts` (new).** Canvas2D body + DOM labels. Every frame samples live `--vscode-*` tokens via `getComputedStyle` (`readThemeTokens`) so the graph reacts to theme switches without host wiring. Native HiDPI via `devicePixelRatio`. `pickNode` inverts the view transform for hit-testing. Labels hide below `scale = 0.6`.
+* **`src/webview/graph/main.ts` (new).** RAF loop, **merge-by-path** on `graphData` (known nodes keep positions, new nodes seed at a hashed angle, removed nodes drop), drag-pin / pan / wheel-zoom around the cursor / hover → 1-hop neighbour highlight / Escape resets the view.
+* **`esbuild.js`.** 4th lazy target: `src/webview/graph/main.ts` → `dist/graph.js` (**19.3 kB**). Mirrors the Mermaid pattern from ADR-0016 — users who never open the graph download zero bytes.
 
-**Resolver unchanged.** Wiki-link clicks and Backlinks still resolve through the shared `LinkIndexService.resolveTarget` (open-first on ambiguity); standard markdown links resolve via plain URI math (the path is given explicitly).
+**Tests.** Unit **199 → 257** (+58: 7 `allEdges` + 18 `graphModel` + 9 messaging guards + 13 `forceSimulation` + 11 `coerceWebviewToHostMessage`). Integration **65** (unchanged — jsdom has no real Canvas2D, so `render.ts` is not jsdom-integration-testable; the pure simulation is unit-tested instead). Exthost **9 → 13** (+4 — graph-view suite: open command lands a `WebviewPanel`, refresh on index change, refresh on active-doc change, click-to-open routes through `openInMarkStudio` / PR #4 handshake). **335 automated tests, 0 failures.**
 
-**Tests.** Unit 172 → **199** (+27: `test/editor/pendingReveals.test.ts` 8; `test/webview/markdownLinkClick.test.ts` 19). Integration 52 → **65** (+13: `test/integration/markdownLinkClick.test.ts`). Exthost 4 → **9** (+5: `test/exthost/suite/navigation.test.ts` — backlinks-opens-MarkStudio, already-open-focuses-MarkStudio, relative-`.md` href, workspace-absolute-`/path` href, external-`https:` no-op). **273 automated tests, 0 failures.**
+**Perf.** Initial F5 trace (`Trace-20260630T183914.json.gz`, 25 MB compressed): **median frame 9.99 ms / 100 fps**, p95 ≈ 20 ms / 50 fps, only **1.9 %** of frames > 33 ms. Two long tasks (~340 ms each) are panel-open boot only — bundle parse + the 60-step warm-up; ongoing interaction stays at 100 fps. **Far exceeds the design-doc budget (60 fps @ 200 nodes / > 30 fps @ 1k).**
 
-**Docs.** ADR-0021 has two amendments (the wiki-link/backlinks reveal handshake, and the standard markdown-link extension); ADR-0020 Decision item 1 marked superseded; [api/message-protocol.md](api/message-protocol.md) documents `openMarkdownLink`; [CHANGELOG.md](CHANGELOG.md) has two new `Fixed` entries; [FEATURES.md](FEATURES.md) Backlinks + In-preview navigation rows refreshed; [PROJECT_STATUS.md](PROJECT_STATUS.md); this handoff.
+**Human F5.** Reviewer confirmed "all good" — graph opens via the command palette and the editor title-bar action; pan, wheel-zoom around the cursor, drag-pin, hover-highlight, click-to-open (lands in MarkStudio, not the raw text editor), Escape-reset, and theme switch all behave.
+
+**Docs.** New ADR-0023 in [DECISIONS.md](DECISIONS.md); new [design/graph-view.md](design/graph-view.md); both messages in [api/message-protocol.md](api/message-protocol.md); [CHANGELOG.md](CHANGELOG.md) new `Added` entry; [FEATURES.md](FEATURES.md) graph-view row flipped to *Shipped*; [ROADMAP.md](ROADMAP.md) Phase 4 → *Done*; [TODO.md](TODO.md) M4.4 → Done; [ARCHITECTURE.md](ARCHITECTURE.md) §4 Graph subsystem entries (host + webview); [PROJECT_STATUS.md](PROJECT_STATUS.md); [sprint-5/plan.md](sprint-5/plan.md), [sprint-5/progress.md](sprint-5/progress.md), [sprint-5/done.md](sprint-5/done.md); [qa/sprint-5-signoff.md](qa/sprint-5-signoff.md); this handoff.
 
 ---
 
 ## 2. Current Work In Progress
 
-* **None.** PR #4 is merged. `main` is `dee909e`, ahead of `origin/main` by this merge + the post-merge docs sync until the Producer pushes (see §8).
+* **None.** Sprint 5 is **code-complete and docs-complete on `feature/sprint-5`**. The only remaining steps are: this Phase-E docs commit, `git push -u origin feature/sprint-5`, `gh pr create`, and the Producer `--no-ff` merge to `main`.
 
 ---
 
 ## 3. Remaining Work for This Initiative
 
-Phase 4 continues. The next roadmap milestone is **M4.4 — Graph view** (M4.3 — transclusion was dropped from scope, 2026-06-30). Tracked follow-ups (in [TODO.md](TODO.md)): T-4.1a (Markdown-link backlinks — *the index, not click-nav; click-nav is now done*), T-4.1c (heading-level backlinks), and the ADR-0021 follow-ups (quick-pick disambiguation, click-to-create, slug-based heading matching, same-document `[[#heading]]` navigation).
+**Phase 4 — Knowledge Management is closed** by this sprint. Two carry-over follow-ups remain open and may be picked up either as small standalone sprints or as part of Phase 5:
+
+* **T-4.1a — Markdown-link backlinks.** Extend `LinkIndex` to index standard markdown links (`[text](./note.md)`) in addition to wiki-links. The Graph view will pick these up for free once they appear in `LinkIndex.allEdges()`.
+* **T-4.1c — Heading-level backlinks / heading-level graph edges.** Currently `[[note#heading]]` is captured but resolved to the file in `LinkIndex`; promoting it to a real per-heading edge would enrich both the Backlinks panel and the Graph view.
+
+The next focus on `main` after this merge is **Phase 5 — Authoring Workflows** ([ROADMAP.md](ROADMAP.md) §5): templates, snippets, daily notes, workspace note features.
 
 ---
 
@@ -59,24 +68,38 @@ Phase 4 continues. The next roadmap milestone is **M4.4 — Graph view** (M4.3 �
 
 | File | Change | Notes |
 | ---- | ------ | ----- |
-| `src/editor/pendingReveals.ts` | New | Pure `PendingReveals` registry (`set` / `take` / `clear`) for the reveal handshake |
-| `src/editor/MarkStudioEditorProvider.ts` | Edited | `controllersByUri` map + `PendingReveals`; public `openInMarkStudio`; `applyPendingReveal` on `ready`; `openWikiLink` and the new `openMarkdownLink` both delegate; `resolveMarkdownLinkUri` (multi-root aware) |
-| `src/links/registerBacklinks.ts` | Edited | Open source in MarkStudio via `provider.openInMarkStudio` |
-| `src/webview/preview/markdownLinkClick.ts` | New | Delegated click listener + pure `isExternalHref` / `parseLocalMarkdownHref` helpers; posts `openMarkdownLink` |
-| `src/webview/main.ts` | Edited | Mount `registerMarkdownLinkClicks(shell.previewPane, bus)` next to `registerWikiLinkClicks` |
-| `src/messaging/messages.ts` | Edited | New `OpenMarkdownLinkMessage` in the union + boundary-guard case |
-| `src/extension.ts` | Edited | `activate()` returns `MarkStudioExtensionApi { provider }` (for Extension Host tests) |
-| `test/editor/pendingReveals.test.ts` | New | 8 unit tests for `PendingReveals` |
-| `test/webview/markdownLinkClick.test.ts` | New | Unit tests for `isExternalHref` + `parseLocalMarkdownHref` |
-| `test/integration/markdownLinkClick.test.ts` | New | jsdom delegated-click integration tests |
-| `test/exthost/suite/navigation.test.ts` | New (then extended) | 5 Extension Host tests — backlinks, already-open, relative `.md`, workspace-absolute `/path`, external `https:` no-op |
-| `test/exthost/index.ts` | Edited | Import the new navigation suite |
-| `test/messaging/messages.test.ts` | Edited | `openMarkdownLink` boundary-guard tests |
-| `docs/DECISIONS.md` | Edited | ADR-0021 two amendments; ADR-0020 item 1 superseded note |
-| `docs/api/message-protocol.md` | Edited | `openMarkdownLink` + `revealLine` notes |
-| `docs/CHANGELOG.md` | Edited | Two new Fixed entries |
-| `docs/FEATURES.md` | Edited | Backlinks + In-preview navigation rows |
-| `docs/PROJECT_STATUS.md` | Edited | Merged-snapshot |
+| `src/links/linkIndex.ts` | Edited | New `GraphEdge` type + pure `allEdges()` getter; dedup + weight in the build pass; deterministic ASCII key (not `localeCompare`) |
+| `src/links/LinkIndexService.ts` | Edited | New `getNotePaths` / `getEdges` / `uriFor` / `pathFor` getters (consumed by `GraphService` only) |
+| `src/graph/graphModel.ts` | New | Pure `buildGraph(paths, edges, currentPath)` |
+| `src/graph/GraphService.ts` | New | Single `WebviewPanel`, debounced post, `openGraphNode` → `openInMarkStudio` (PR #4 handshake); `coerceWebviewToHostMessage` exported |
+| `src/graph/webviewHtml.ts` | New | Strict-CSP HTML scaffold |
+| `src/messaging/messages.ts` | Edited | `GraphDataMessage` + `OpenGraphNodeMessage` + boundary-guard cases |
+| `src/extension.ts` | Edited | Wired `GraphService`; exposed on `MarkStudioExtensionApi` |
+| `package.json` | Edited | `markstudio.graph.show` command + `menus.editor/title` entry |
+| `esbuild.js` | Edited | 4th lazy target → `dist/graph.js` |
+| `src/webview/graph/forceSimulation.ts` | New | Pure F–R simulation, FNV-1a `seedPosition`, kinetic-energy stop |
+| `src/webview/graph/render.ts` | New | Canvas2D + DOM labels + per-frame `--vscode-*` token read |
+| `src/webview/graph/main.ts` | New | RAF loop, merge-by-path, drag/pan/zoom/hover/click/Esc |
+| `test/graph/graphModel.test.ts` | New | 18 unit tests |
+| `test/graph/coerceWebviewToHostMessage.test.ts` | New | 11 boundary-guard tests |
+| `test/webview/graph/forceSimulation.test.ts` | New | 13 unit tests |
+| `test/exthost/suite/graphView.test.ts` | New | 4 exthost tests |
+| `test/exthost/index.ts` | Edited | Import the new suite |
+| `test/links/linkIndex.test.ts` | Edited | +7 `allEdges` tests |
+| `test/messaging/messages.test.ts` | Edited | +9 graph-message guard tests |
+| `docs/DECISIONS.md` | Edited | New **ADR-0023** appended |
+| `docs/design/graph-view.md` | New | Pre-impl design (data flow, modules, force-sim shape, token map, perf budget) |
+| `docs/api/message-protocol.md` | Edited | `graphData` + `openGraphNode` |
+| `docs/CHANGELOG.md` | Edited | New `Added` entry for M4.4 |
+| `docs/FEATURES.md` | Edited | Graph view row → *Shipped* |
+| `docs/ROADMAP.md` | Edited | Phase 4 → *Done* |
+| `docs/TODO.md` | Edited | M4.4 → Done; current-focus paragraph flipped to Phase 5 |
+| `docs/ARCHITECTURE.md` | Edited | §4 Graph subsystem entries (host + webview) |
+| `docs/PROJECT_STATUS.md` | Edited | §1 / §2 / §3 / §4 / §6 / §8 / §9 / §10 |
+| `docs/sprint-5/plan.md` | New | Sprint source of truth |
+| `docs/sprint-5/progress.md` | New | Live tracker (Phases A → E) |
+| `docs/sprint-5/done.md` | New | Sprint handoff |
+| `docs/qa/sprint-5-signoff.md` | New | QA sign-off (Ivy) — gate green + F5 ✅ + perf ✅ |
 | `docs/AGENT_HANDOFF.md` | Rewritten | This file |
 
 `dist/`, `dist-test/`, and `.vscode-test/` are build/download artifacts (git-ignored), not committed.
@@ -85,38 +108,45 @@ Phase 4 continues. The next roadmap milestone is **M4.4 — Graph view** (M4.3 �
 
 ## 5. Decisions Made
 
-* **Open `.md` targets in MarkStudio (not the built-in text editor) for click-navigation, backlinks, AND standard markdown links**, via `vscode.openWith` with the MarkStudio view type — consistency with the project philosophy (MarkStudio is *the* Markdown experience).
-  * **Recorded as ADR?** Yes → **ADR-0021 amendment (2026-06-30)** for wiki-links / backlinks; **ADR-0021 second amendment (2026-06-30)** for standard markdown links.
-* **Reveal via the existing `revealLine` message + a pending-reveal handshake**, not a new message: a MarkStudio editor is a webview, so the line cannot ride `showTextDocument`'s `selection`. Already-open → reveal in place; not-yet-open → park the line and apply on `ready`.
-  * **Recorded as ADR?** Covered by the ADR-0021 amendment.
-* **One shared `openInMarkStudio(uri, line)` on the provider** backs all three call sites, so they cannot drift.
-  * **Recorded as ADR?** Covered by the ADR-0021 amendment.
-* **Standard markdown links resolve via plain URI math, *not* the workspace link index.** The link index is a wiki-link basename index (it does not know about `./foo.md` syntax); standard markdown links carry an explicit relative or workspace-absolute path that `vscode.Uri.joinPath` resolves directly. Multi-root: a `/`-prefixed target is workspace-absolute against *the source note's* workspace folder.
-  * **Recorded as ADR?** Yes → **ADR-0021 second amendment (2026-06-30)**.
+* **Zero new runtime dependencies for the graph.** d3-force, cytoscape.js, vis-network all rejected. We pay one-time author cost for a small hand-rolled F–R + Canvas2D in exchange for: tiny lazy bundle, no transitive risk, native VS Code theming, full control over the click-to-open handshake.
+  * **Recorded as ADR?** Yes → **ADR-0023**.
+* **Host model is pure; webview ships as a lazy 4th esbuild bundle.** Mirrors the Mermaid pattern (ADR-0016) — users who never open the graph download zero bytes.
+  * **Recorded as ADR?** Yes → **ADR-0023**.
+* **Click-to-open must route through `provider.openInMarkStudio`.** The PR #4 pending-reveal handshake is the *only* sanctioned path; never `vscode.window.showTextDocument` (would land in the raw text editor, the lesson behind ADR-0021).
+  * **Recorded as ADR?** Yes → **ADR-0023** (and reinforced by ADR-0021).
+* **Wiki-link edges only in v1.** T-4.1a (Markdown-link edges) and T-4.1c (heading-level edges) are deferred — they belong to their own tasks; the graph will pick them up for free once they land in `LinkIndex.allEdges()`.
+  * **Recorded as ADR?** Yes → **ADR-0023**.
+* **No new setting; `markstudio.graph.show` command + editor title-bar action are the only surfaces.** Discussed adding an in-webview toolbar (rejected — mixes UX categories) and an activity-bar entry (rejected — too heavy for a single panel). A `Ctrl+K Ctrl+G` keybinding is deferred pending a discoverability signal.
+  * **Recorded as ADR?** Captured in `docs/sprint-5/plan.md` Producer policy + ADR-0023.
+* **Deterministic ASCII-codepoint sort, not `localeCompare`.** Phase B caught a real bug: `localeCompare` is locale-dependent and produced different test outputs on different machines. The graph + edge dedup keys use `(a < b ? -1 : a > b ? 1 : 0)` everywhere now.
+  * **Recorded as ADR?** Captured in ADR-0023 and the graph-view design doc.
 
 ---
 
 ## 6. Assumptions Made
 
-* **Messages are processed in order in the webview**, so a `revealLine` sent right after `init` (on `ready`) is applied after the editor is built — matching how the outline tree's `revealLine` already works against a built editor.
-* **`vscode.openWith` on an already-open document focuses the existing custom editor** (no duplicate, since `supportsMultipleEditorsPerDocument: false`).
-* **The heading line is computed from the freshly opened target document's text** (`findHeadingLine`, raw-source exact match — the same v1 limitation as before; slug matching is the tracked follow-up).
-* **A workspace-absolute (`/path`) markdown link is interpreted relative to the *source note's* workspace folder**, falling back to the first workspace folder when the source is outside the workspace.
+* **`vscode.WebviewPanel.reveal()` is idempotent** — calling it on an already-visible panel does not flicker or rebuild the webview (`retainContextWhenHidden: true`).
+* **`onDidChangeIndex` is debounced upstream by `LinkIndexService` already**, so the additional 250 ms debounce in `GraphService.scheduleRefresh` is a defence-in-depth coalescer for bursts (e.g. a multi-file rename), not the primary throttle.
+* **The webview's `--vscode-*` tokens are stable through the panel's lifetime in a single theme**, so the per-frame `getComputedStyle` read in `readThemeTokens` is cheap (modern browsers cache; we measured no perf impact in the trace).
+* **`devicePixelRatio` can change at runtime** (e.g. drag the window to a different monitor) — `fitCanvasToDevicePixels` re-reads it every resize.
+* **`Math.random` is forbidden in the simulation** — node seed positions come from a deterministic FNV-1a hash of the path, so layouts are reproducible across sessions for the same vault.
 
 ---
 
 ## 7. Technical Debt Introduced
 
-* **None new.** The fix removes a behavioural wart without adding scope. Carried-over debt is unchanged from the prior handoff (raw-source `findHeadingLine`, open-first on ambiguous basenames, status-bar-only unresolved targets, inert same-document `[[#heading]]`, wiki-links-only backlinks index, file-level `#heading` grouping, multi-root path-key collisions, Mermaid live re-theme, always-bundled KaTeX, console-only failure logging, active-webview-only commands/indicator, keyboard-only find panel, accumulating `StateStore` Memento entries, linear scroll-sync interpolation, raw-source outline text, read-only task-list checkboxes).
-
-None of these reverse the architecture; they are scoped placeholders with named successors.
+* **O(N²) repulsion in the force simulation.** Acceptable to ~1k nodes per the design-doc budget (and the perf trace confirms 100 fps on the working vault). A Barnes–Hut quadtree is the obvious upgrade if a user reports degradation; tracked as an ADR-0023 follow-up.
+* **No position persistence across sessions.** Drag-pinned nodes are forgotten when the panel closes. A `Memento`-backed layer is the obvious next step; tracked as an ADR-0023 follow-up.
+* **Wiki-link edges only.** T-4.1a / T-4.1c carry-overs (above) cover this — the graph itself needs no further work to render them once `allEdges()` produces them.
+* **Full vault matrix not yet executed.** F5 + the perf trace are evidence at the small-vault scale; a 10 / 100 / 1k synthetic vault sweep is the obvious hardening task and would be a good lead-in to a future Barnes–Hut upgrade.
+* **No new debt elsewhere.** Carried-over debt is unchanged from the prior handoff.
 
 ---
 
 ## 8. Blockers
 
-* **None.** The fix is merged on `main` (`dee909e`); local gate is green.
-* **Push gate:** the Producer still needs to `git push origin main` so `origin/main` catches up to the local merge commit + the post-merge docs sync.
+* **None.** All gates green, F5 verified, QA signed off.
+* **Next mechanical step:** `git push -u origin feature/sprint-5` followed by `gh pr create`. The Producer (human) then performs the `--no-ff` merge to `main`. **Producer does not merge their own PR** — that's the human's job.
 
 ---
 
@@ -125,32 +155,35 @@ None of these reverse the architecture; they are scoped placeholders with named 
 * [x] `npm run lint` — ESLint clean (`--max-warnings 0`) + `prettier --check .` clean
 * [x] `npm run typecheck` (strict, `src`) passes
 * [x] `npm run typecheck:test` (strict, `src` + `test`) passes
-* [x] `npm run build` passes — host bundle `dist/extension.js` **~55.2 KB**
-* [x] `npm test` passes — **264 tests** (199 unit + 65 integration, `node:test`)
-* [x] `npm run test:exthost` passes — **9** Extension Host tests (a harmless "Error mutex already exists" log prints; exit code 0)
-* [x] **Manual verification in an Extension Development Host (F5)** — user-confirmed "all good" before merge (wiki-link click, backlinks row, standard markdown link, `#heading` reveal, already-open focus, external link untouched, modifier-key passthrough).
-* [x] Webview is not recreated (reveal is a `postMessage`); CodeMirror state preserved.
+* [x] `npm run build` passes — host `dist/extension.js` **~65.5 kB**, preview `dist/webview.js` ~2.0 MB (unchanged), Mermaid `dist/mermaid.js` ~7.5 MB (unchanged), **new** `dist/graph.js` **19.3 kB**
+* [x] `npm test` passes — **322 tests** (257 unit + 65 integration, `node:test`)
+* [x] `npm run test:exthost` passes — **13** Extension Host tests
+* [x] **Manual verification in an Extension Development Host (F5)** — user-confirmed "all good": graph opens via command palette + editor title-bar action; pan / wheel-zoom around cursor / drag-pin / hover-highlight / click-to-open (lands in MarkStudio) / Escape-reset / theme-switch all behave.
+* [x] **Perf trace** — median 100 fps / p95 50 fps / 1.9 % slow frames; exceeds the 60-fps budget. User confirmed "yes mark it done all good".
+* [x] **QA sign-off** written: `docs/qa/sprint-5-signoff.md`.
+* [x] Webview panel is not recreated on data refresh; `retainContextWhenHidden: true` preserves the simulation state across hide/show.
 
 ---
 
 ## 10. Recommended Next Task
 
-* **Task:** Continue Phase 4 with **M4.4 — Graph view**.
-* **Why this one:** Next roadmap milestone after backlinks + click-navigation + hover preview (M4.3 — transclusion was dropped from scope, 2026-06-30).
+* **Task:** After the Producer merges `feature/sprint-5` to `main` (post `gh pr create` + human `--no-ff` merge), **Phase 4 is closed** and the next focus is **Phase 5 — Authoring Workflows** per [ROADMAP.md](ROADMAP.md) §5: templates, snippets, daily notes, workspace note features.
+* **Alternative smaller next tasks:** the two carry-over Phase 4 follow-ups — **T-4.1a (Markdown-link edges in the link index)** and **T-4.1c (heading-level edges)**. Both are resolver-backed; the Graph view will pick them up for free once they appear in `LinkIndex.allEdges()`.
+* **Why Phase 5:** Phase 4 (Knowledge Management) is now complete on this branch; the natural next theme is authoring ergonomics that build on the now-stable PKM layer.
 * **Suggested prompt:** [.ai/PROMPTS/feature.md](../.ai/PROMPTS/feature.md).
 * **Starting files to read:**
   * [PROJECT_STATUS.md](PROJECT_STATUS.md) — current snapshot
-  * [ROADMAP.md](ROADMAP.md) — Phase 4 milestones
-  * `src/links/` — the shared link index + resolver (`LinkIndexService`, `resolveTarget`, `resolveForward`)
-  * `src/outline/` — a precedent for a host-side tree view that follows the active document
+  * [ROADMAP.md](ROADMAP.md) §5 — Phase 5 milestones
+  * `src/links/LinkIndexService.ts` — for T-4.1a / T-4.1c, the surface to extend
+  * `src/graph/graphModel.ts` + `src/graph/GraphService.ts` — for any graph follow-ups (Barnes–Hut, position persistence, etc.)
 
 ---
 
 ## 11. Open Questions for the Next Agent
 
-* **Should the already-open case scroll the existing editor even when it is in another tab group**, or only when focused? (Current behaviour: `openWith` focuses it, then reveals.)
-* **Should ambiguous basenames get a quick-pick** rather than silently opening the first match (ADR-0021 follow-up)?
-* **Should unresolved targets offer click-to-create** (with templates / location / front-matter), or stay a status-bar message?
-* **Should heading matching slugify** (shared with the outline) so `[[Note#Bold]]` finds `## **Bold**`?
-* **Should same-document `[[#heading]]` links scroll within the active note**, and if so via the editor (`revealLine`) or the preview?
-* **Should standard markdown links also support non-`.md` targets** (`./image.png`, `./script.js`) by opening them with `vscode.commands.executeCommand("vscode.open", uri)`, or stay strict-`.md`?
+* **Should drag-pinned node positions persist across panel close / VS Code restart** via `Memento`? If yes, scope it per workspace folder (multi-root) or per vault root.
+* **Should the graph offer a "focus mode"** that hides nodes outside N hops from the active document? (The 1-hop hover highlight is the lightweight precursor.)
+* **Should we add a Barnes–Hut quadtree** now (preemptively, to push the perf headroom to ~10k nodes), or wait for a user report?
+* **Should `Ctrl+K Ctrl+G` be reserved as the graph-open keybinding** if discoverability ever becomes a complaint, or is the editor title-bar action enough?
+* **Should the graph also render Markdown-link edges** as soon as T-4.1a lands, or stay wiki-link only by design? (The current `allEdges()` getter would expose them automatically — opt-in or opt-out.)
+* **Should `markstudio.preview.wikiLinks = false` also hide wiki-link edges in the graph**, for consistency? (Currently the graph is always all-on; the toggle only gates the preview anchors.)

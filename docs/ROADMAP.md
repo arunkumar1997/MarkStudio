@@ -83,18 +83,22 @@ The syntax extensions that make Markdown feel modern. Each attaches as a CodeMir
 
 ---
 
-## Phase 4 — Knowledge Management · *In progress*
+## Phase 4 — Knowledge Management · *Done*
 
-Begin the PKM layer — only after the core is unshakeable.
+The PKM layer — built on the unshakeable core delivered in Phases 0–3.
 
 **Milestones**
-* M4.1 — Backlinks panel *(Done — T-4.1; native `MarkStudio Backlinks` tree view over a host-side, async, watcher-backed link index; lands the wiki-link resolver deferred from Phase 3, ADR-0020)*
-  * T-4.1b — In-preview wiki-link navigation *(Done; clicking `[[note]]` in the preview opens the target via the shared M4.1 resolver, ADR-0021)*
-* M4.2 — Hover preview for links *(Done — M4.2; hovering `[[note]]` / `[[note#heading]]` in the preview shows a floating card previewing the target — the host ships a capped Markdown excerpt, the webview renders it with the existing renderer, reusing the shared M4.1 resolver + heading scanner, ADR-0022)*
-* M4.4 — Graph view
+
+- M4.1 — Backlinks panel _(Done — T-4.1; native `MarkStudio Backlinks` tree view over a host-side, async, watcher-backed link index; lands the wiki-link resolver deferred from Phase 3, ADR-0020)_
+  - T-4.1b — In-preview wiki-link navigation _(Done; clicking `[[note]]` in the preview opens the target via the shared M4.1 resolver, ADR-0021)_
+- M4.2 — Hover preview for links _(Done — M4.2; hovering `[[note]]` / `[[note#heading]]` in the preview shows a floating card previewing the target, ADR-0022)_
+- M4.4 — Graph view _(Done — Sprint 5; interactive workspace-wide note⇄wiki-link topology in a free-standing webview panel, hand-rolled Fruchterman–Reingold + Canvas2D + DOM-label render, zero new runtime deps, ADR-0023)_
+- _M4.3 — Transclusion: dropped from scope on 2026-06-30 (Producer decision)._
 
 **Exit criteria**
-* Link indexing scales to a large workspace without blocking the UI. *(On track — the initial scan is async/batched and kicked off but not awaited; watcher updates are debounced and incremental, ADR-0020)*
+
+- Link indexing scales to a large workspace without blocking the UI. _(Met — the initial scan is async/batched and kicked off but not awaited; watcher updates are debounced and incremental, ADR-0020)_
+- Graph view renders at ≥ 30 fps on typical vaults. _(Met — Sprint 5 trace on initial F5: median 100 fps, p95 50 fps, only 1.9 % of frames > 33 ms.)_
 
 ---
 
