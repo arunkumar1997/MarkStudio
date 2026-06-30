@@ -4,7 +4,7 @@
 >
 > Each task has: an **ID**, a **description**, **files involved** (planned paths from [ARCHITECTURE.md](ARCHITECTURE.md)), **dependencies**, and a **complexity** estimate (S / M / L).
 
-The immediate focus has shifted to **Phase 5 — Authoring Workflows** ([ROADMAP.md](ROADMAP.md)). Phases 0–4 are all complete: M4.1 — Backlinks panel (T-4.1), T-4.1b — In-preview wiki-link navigation, M4.2 — Hover preview, and **M4.4 — Graph view** (Sprint 5) are all merged or pending merge. M4.3 — transclusion was dropped from scope (2026-06-30). See [AGENT_HANDOFF.md](AGENT_HANDOFF.md) §10 for the next sprint.
+The immediate focus has shifted to **Phase 5 — Authoring Workflows** ([ROADMAP.md](ROADMAP.md)). Phases 0–4 are all complete: M4.1 — Backlinks panel (T-4.1), T-4.1a — Markdown-link backlinks (Sprint 6), T-4.1b — In-preview wiki-link navigation, T-4.1c — Heading-level backlinks (Sprint 6), M4.2 — Hover preview, and **M4.4 — Graph view** (Sprint 5) are all merged or pending merge. M4.3 — transclusion was dropped from scope (2026-06-30). See [AGENT_HANDOFF.md](AGENT_HANDOFF.md) §10 for the next sprint.
 
 ---
 
@@ -20,17 +20,7 @@ The immediate focus has shifted to **Phase 5 — Authoring Workflows** ([ROADMAP
 
 ## Medium Priority — Phase 4 follow-ups (from T-4.1)
 
-### T-4.1a · Markdown-link backlinks
-* **Description:** Index standard Markdown links (`[text](note.md)`) as backlinks in addition to wiki-links. A second extractor feeds the same `LinkIndexService` / `linkIndex` reverse index; resolve relative `.md` paths (and bare basenames) the same way the wiki-link resolver does.
-* **Files involved:** `src/links/parseMarkdownTargets.ts` (new), `src/links/LinkIndexService.ts`, `src/links/linkIndex.ts`
-* **Dependencies:** T-4.1
-* **Complexity:** M
-
-### T-4.1c · Heading-level backlinks
-* **Description:** Group/resolve `[[note#heading]]` at the heading level rather than only capturing the heading and grouping per file. Reuses the host-side heading scanner (`src/outline/headings.ts`) to map a heading anchor to a line.
-* **Files involved:** `src/links/linkIndex.ts`, `src/links/BacklinksTreeProvider.ts`, `src/outline/headings.ts`
-* **Dependencies:** T-4.1, T-2.2
-* **Complexity:** M
+*(none — T-4.1a and T-4.1c shipped in Sprint 6; Phase 4 is fully closed. See [CHANGELOG.md](CHANGELOG.md) and ADR-0024.)*
 
 ## Low Priority
 

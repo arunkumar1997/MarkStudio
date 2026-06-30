@@ -6,19 +6,19 @@
 
 ---
 
-## Status: � Phase A (design) — COMPLETE → Phase B (T-4.1a host) up next
+## Status: ✅ Sprint 6 COMPLETE — PR ready on `feature/sprint-6` (pending Producer `--no-ff` merge)
 
 | # | Phase / Task | State | Owner | Notes |
 |---|---|---|---|---|
 | **A** | **Design + ADR-0024 + `design/backlinks.md` v2 section** | ✅ Done | Remy / Sage | Plan, ADR-0024, and design v2 section landed on `feature/sprint-6` |
-| 1 | `parseMarkdownTargets.ts` — pure extractor + tests | ⬜ Not started | Sage | Mirror `parseWikiTargets.ts` shape |
-| 2 | `linkIndex.ts` — `NoteLink.kind`, `Backlink.targetLine`, heading-line cache, `resolveMarkdownTarget` | ⬜ Not started | Sage | Additive widening only |
-| 3 | `LinkIndexService.ts` — dual-parse merge | ⬜ Not started | Sage | No new event, no new watcher |
-| 4 | `BacklinksTreeProvider.ts` — `iconPath` per kind, heading description, tooltip target-line | ⬜ Not started | Milo (visual) + Sage | `$(symbol-reference)` wiki / `$(link)` markdown |
-| 5 | Unit tests: extractor + index + heading cache + backwards-compat | ⬜ Not started | Ivy | Target ~+30 unit |
-| 6 | Integration test: mixed-kind fixture vault | ⬜ Not started | Ivy | Target +5 integration |
-| 7 | Docs pass | ⬜ Not started | Sage + Remy | ADR-0024, design v2 section, status/handoff/roadmap/todo/features/changelog/architecture |
-| 8 | Manual F5: mixed vault, theme matrix, graph picks up Markdown edges | ⬜ Not started | Ivy + human | After Phase D |
+| 1 | `parseMarkdownTargets.ts` — pure extractor + tests | ✅ Done | Sage | Mirrors `parseWikiTargets.ts` shape; +33 unit tests |
+| 2 | `linkIndex.ts` — `NoteLink.kind`, `Backlink.targetLine`, heading-line cache, `resolveMarkdownTarget` | ✅ Done | Sage | Additive widening only; per-build cache keyed `${targetPath}\u0000${heading}` |
+| 3 | `LinkIndexService.ts` — dual-parse merge | ✅ Done | Sage | No new event, no new watcher; threads source text through `ParsedNote.text` |
+| 4 | `BacklinksTreeProvider.ts` — `iconPath` per kind, heading description, tooltip target-line | ✅ Done | Milo (visual) + Sage | `$(symbol-reference)` wiki / `$(link)` markdown |
+| 5 | Unit tests: extractor + index + heading cache + backwards-compat | ✅ Done | Ivy | +49 unit (33 extractor + 7 T-4.1a + 9 T-4.1c) |
+| 6 | Integration-style test: mixed-kind fixture vault | ✅ Done | Ivy | +10 in `test/links/backlinksTreeProvider.test.ts`; widened `test/_mocks/vscode.ts` |
+| 7 | Docs pass | ✅ Done | Sage + Remy | ADR-0024, design v2 section, status/handoff/roadmap/todo/features/changelog/architecture/done/sign-off |
+| 8 | Manual F5: mixed vault, theme matrix, graph picks up Markdown edges | ⏳ Producer-owned | Producer | Per `plan.md` §6 row "D" |
 
 ## Verification (local)
 
@@ -35,7 +35,8 @@
 * `c0c27d5` — `docs(sprint-6): ADR-0024 + design v2 section (Phase A)` — Phase A close-out.
 * `7eb1dcf` — `feat(links): Markdown-link backlinks (T-4.1a, Phase B)` — Phase B close-out.
 * `752a6ac` — `feat(links): heading-level backlinks (T-4.1c, Phase C)` — Phase C close-out.
-* _(Phase D finish)_ — `test(links): Backlinks tree pipeline coverage (Phase D)` — to be recorded after the commit.
+* `bcc3edf` — `test(links): Backlinks tree pipeline coverage (Phase D)` — Phase D close-out.
+* `9121623` — `docs(sprint-6): close-out + QA sign-off (Phase E)` — Phase E close-out.
 
 ## Bundle sizes (running)
 
