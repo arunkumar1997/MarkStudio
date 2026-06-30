@@ -4,7 +4,7 @@
 >
 > Each task has: an **ID**, a **description**, **files involved** (planned paths from [ARCHITECTURE.md](ARCHITECTURE.md)), **dependencies**, and a **complexity** estimate (S / M / L).
 
-The immediate focus is now **Phase 4 — Knowledge Management** ([ROADMAP.md](ROADMAP.md)). Phase 1 — Editing Core, Phase 2 — Editing Quality, and **Phase 3 — Modern Markdown** are complete (M3.1 math, M3.2 Mermaid, M3.3 callouts, M3.4 wiki links, M3.5 footnotes & GFM completeness). **Phase 4 is under way: M4.1 — Backlinks panel (T-4.1) is Done and merged to `main`** (merge `79369f2`), and **T-4.1b — In-preview wiki-link navigation** is Done on `feature/sprint-3` (Sprint 3, awaiting QA sign-off + Producer merge). The next candidates are the remaining Phase 4 follow-ups below; see also [AGENT_HANDOFF.md](AGENT_HANDOFF.md) §10.
+The immediate focus is now **Phase 4 — Knowledge Management** ([ROADMAP.md](ROADMAP.md)). Phase 1 — Editing Core, Phase 2 — Editing Quality, and **Phase 3 — Modern Markdown** are complete (M3.1 math, M3.2 Mermaid, M3.3 callouts, M3.4 wiki links, M3.5 footnotes & GFM completeness). **Phase 4 is under way: M4.1 — Backlinks panel (T-4.1) is Done and merged to `main`** (merge `79369f2`), and **T-4.1b — In-preview wiki-link navigation** is Done and merged to `main` (Sprint 3, PR #1, `--no-ff` merge `011901e`). The next milestone is **M4.2 — Hover preview for links**; see also the remaining Phase 4 follow-ups below and [AGENT_HANDOFF.md](AGENT_HANDOFF.md) §10.
 
 ---
 

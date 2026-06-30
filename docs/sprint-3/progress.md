@@ -6,7 +6,7 @@
 
 ---
 
-## Status: DONE (dev) — implementation + tests + docs complete; awaiting push, QA sign-off, Producer merge (2026-06-28)
+## Status: ✅ MERGED — Sprint 3 closed; QA signed + §5 EDH spot-check passed (maintainer), merged to `main` via `--no-ff` (merge `011901e`) (2026-06-30)
 
 | # | Phase / Task | State | Owner | Notes |
 |---|---|---|---|---|
@@ -17,7 +17,7 @@
 | 5 | Webview delegated click handler on the preview root | ✅ Done | Nova | new `wikiLinkClick.ts`; one listener on `shell.previewPane`; inert for empty target |
 | 6 | ADR-0021 (shared index / new message) + `design/wiki-navigation.md` | ✅ Done | Sage + Producer | ADR-0021 + index row; design note created |
 | 7 | Unit + integration tests (resolver, guard, heading, click→message seam) | ✅ Done | Ivy | unit 132→152 (+20); integration 39→45 (+6); exthost 4 |
-| 8 | Manual EDH (F5): click target/alias/heading, ambiguous, unresolved, theme matrix | ☐ Todo | Ivy | post-push QA spot-check |
+| 8 | Manual EDH (F5): click target/alias/heading, ambiguous, unresolved, theme matrix | ✅ Done | Ivy / maintainer | §5 matrix run on a multi-file workspace incl. the #2 delete-mid-debounce repro — all pass |
 | 9 | Docs pass + TODO T-4.1b → Done + QA sign-off | ✅ Done (docs) | Sage + Producer | `api/message-protocol.md`, CHANGELOG, FEATURES, ROADMAP, TODO, ARCHITECTURE, PROJECT_STATUS, AGENT_HANDOFF updated; QA sign-off doc is Ivy's post-merge |
 
 ## Verification (local)

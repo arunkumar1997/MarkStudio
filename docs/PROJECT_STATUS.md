@@ -1,4 +1,4 @@
-# PROJECT STATUS — 2026-06-28
+# PROJECT STATUS — 2026-06-30
 
 > Overwritten at the end of every working session. History lives in git. Template: [.ai/TEMPLATES/STATUS.md](../.ai/TEMPLATES/STATUS.md).
 
@@ -7,16 +7,16 @@
 ## 1. Snapshot
 
 * **Current phase:** **Phase 4 — Knowledge Management is UNDER WAY.** Phase 0, Phase 1 — Editing Core, Phase 2 — Editing Quality, and Phase 3 — Modern Markdown are all complete.
-* **Current milestone:** **T-4.1b — In-preview wiki-link navigation Done on `feature/sprint-3`** (Sprint 3, awaiting QA sign-off + Producer merge). The wiki-links the preview renders (T-3.4) are now **clickable**: clicking `[[note]]` / `[[note|alias]]` / `[[note#heading]]` in the preview opens the target note in an editor (revealing the heading line when present) — the in-document counterpart to the M4.1 Backlinks panel. One **delegated** click listener on the persistent preview pane posts a new typed **`openWikiLink`** webview → host message; the host resolves through the **shared M4.1 index** (a new pure `LinkIndex.resolveForward` + `LinkIndexService.resolveTarget`) so the panel and click-navigation resolve identically, and reveals the heading via a new pure `findHeadingLine`. A single `LinkIndexService` is now **hoisted to `extension.ts`** and injected into both registrations. Producer policy: existing-notes-only (unresolved → transient status-bar message), open-first on ambiguity, **no new setting** (gated by `markstudio.preview.wikiLinks`). **No new dependency, no new setting, no new command.** (ADR-0021.) M4.1 — Backlinks panel (T-4.1) remains merged to `main` (merge `79369f2`).
-* **Overall completion (qualitative):** Phase 0: 100%. Phase 1: 100%. Phase 2: 100%. Phase 3: 100%. **Phase 4: M4.1 done + T-4.1b done (unmerged)** (M4.2 hover preview, M4.3 transclusion, M4.4 graph view remain).
-* **Last updated:** 2026-06-28 by the Dev Team (Sage + Nova) — T-4.1b implementation + docs
-* **Last commit on `main`:** `14cccd7` *(Sprint 3 planning; T-4.1 merged via `--no-ff` merge `79369f2`). T-4.1b work lives on `feature/sprint-3`, not yet merged — Producer merges after QA sign-off.*
+* **Current milestone:** **T-4.1b — In-preview wiki-link navigation merged to `main`** (Sprint 3, PR #1, `--no-ff` merge `011901e`, 2026-06-30). The wiki-links the preview renders (T-3.4) are now **clickable**: clicking `[[note]]` / `[[note|alias]]` / `[[note#heading]]` in the preview opens the target note in an editor (revealing the heading line when present) — the in-document counterpart to the M4.1 Backlinks panel. One **delegated** click listener on the persistent preview pane posts a new typed **`openWikiLink`** webview → host message; the host resolves through the **shared M4.1 index** (a new pure `LinkIndex.resolveForward` + `LinkIndexService.resolveTarget`) so the panel and click-navigation resolve identically, and reveals the heading via a new pure `findHeadingLine`. A single `LinkIndexService` is now **hoisted to `extension.ts`** and injected into both registrations. Producer policy: existing-notes-only (unresolved → transient status-bar message), open-first on ambiguity, **no new setting** (gated by `markstudio.preview.wikiLinks`). **No new dependency, no new setting, no new command.** (ADR-0021.) M4.1 — Backlinks panel (T-4.1) remains merged to `main` (merge `79369f2`).
+* **Overall completion (qualitative):** Phase 0: 100%. Phase 1: 100%. Phase 2: 100%. Phase 3: 100%. **Phase 4: M4.1 + T-4.1b merged** (M4.2 hover preview, M4.3 transclusion, M4.4 graph view remain).
+* **Last updated:** 2026-06-30 by the Producer (Remy) — T-4.1b merged to `main` (PR #1)
+* **Last commit on `main`:** `011901e` *(`--no-ff` merge of `feature/sprint-3` / PR #1 — T-4.1b in-preview wiki-link navigation). M4.1 (T-4.1) was merged earlier via `79369f2`.*
 
 ---
 
 ## 2. Current Focus
 
-* **Active initiative:** **Phase 4 — Knowledge Management.** M4.1 (Backlinks panel, T-4.1) is merged; **T-4.1b (in-preview wiki-link navigation)** is implemented + tested on `feature/sprint-3`, awaiting QA sign-off and the Producer merge. The next milestone after merge is **M4.2 — Hover preview for links** (also resolver-backed).
+* **Active initiative:** **Phase 4 — Knowledge Management.** M4.1 (Backlinks panel, T-4.1) and **T-4.1b (in-preview wiki-link navigation)** are both merged to `main`. The next milestone is **M4.2 — Hover preview for links** (also resolver-backed).
 * **Owner (this sprint):** Sage (host resolver + messaging) + Nova (webview click handler); QA: Ivy
 * **Started:** Sprint 3 executed 2026-06-28
 * **Target outcome:** T-4.1b merged after QA; then M4.2 hover preview. See [TODO.md](TODO.md) and [AGENT_HANDOFF.md](AGENT_HANDOFF.md) §10.
@@ -61,7 +61,7 @@ For details, see [FEATURES.md](FEATURES.md).
 
 | Item | State | Owner | Notes |
 | ---- | ----- | ----- | ----- |
-| **T-4.1b — In-preview wiki-link navigation** | Implemented + tested on `feature/sprint-3`; awaiting QA sign-off + Producer merge | Sage / Nova | Manual EDH matrix (Phase 8) + QA sign-off (`docs/qa/sprint-3-signoff.md`) are post-push items; next roadmap milestone is M4.2 — Hover preview for links |
+| **None in flight** | — | — | T-4.1b merged (PR #1, `011901e`); next roadmap milestone is M4.2 — Hover preview for links |
 
 ---
 

@@ -1,4 +1,4 @@
-# AGENT HANDOFF — T-4.1b In-preview wiki-link navigation done on `feature/sprint-3` (2026-06-28)
+# AGENT HANDOFF — T-4.1b In-preview wiki-link navigation MERGED to `main` (2026-06-30)
 
 > Overwrite this file at the end of every working session; do not append. The previous handoff is preserved in git history. Template: [.ai/TEMPLATES/HANDOFF.md](../.ai/TEMPLATES/HANDOFF.md).
 >
@@ -8,12 +8,12 @@
 
 ## Session Metadata
 
-* **Date:** 2026-06-28
-* **Agent / Author:** Dev Team (Sage — host resolver + messaging; Nova — webview click handler)
-* **Working branch:** `feature/sprint-3` (off `main` `14cccd7`)
-* **Last commit on `main`:** `14cccd7` *(Sprint 3 planning; T-4.1 merged via `--no-ff` merge `79369f2`)*
-* **Branch state:** `feature/sprint-3` carries the T-4.1b feature commit + this docs commit; **not merged** — Producer merges after QA sign-off.
-* **Prompt used:** ai-team-dev mode (Sprint 3 kickoff)
+* **Date:** 2026-06-30
+* **Agent / Author:** Producer (Remy) — merge + post-merge docs sync; impl by Dev Team (Sage + Nova), QA by Ivy
+* **Working branch:** `main` (T-4.1b merged from `feature/sprint-3`)
+* **Last commit on `main`:** `011901e` *(`--no-ff` merge of `feature/sprint-3` / PR #1 — T-4.1b; M4.1 / T-4.1 merged earlier via `79369f2`)*
+* **Branch state:** `feature/sprint-3` (`b45b3ee`) merged into `main` via `--no-ff` (merge `011901e`); regular merge, no squash/rebase.
+* **Prompt used:** ai-team-producer (Sprint 3 close-out)
 
 ---
 
@@ -37,9 +37,9 @@ Implemented **T-4.1b — In-preview wiki-link navigation** (Phase 4), making the
 
 ## 2. Current Work In Progress
 
-* **Item:** None in-flight. T-4.1b is implemented, tested, and committed on `feature/sprint-3`; the full local pipeline is green: `npm run lint`, `npm run typecheck`, `npm run typecheck:test`, `npm run build`, `npm test` (152 unit + 45 integration); `npm run test:exthost` (4) also passes.
-* **Awaiting:** push + PR, then QA sign-off (`docs/qa/sprint-3-signoff.md`) and the Producer `--no-ff` merge. **Dev does not merge.**
-* **Note on git:** `feature/sprint-3` branches off `main` `14cccd7`; merge with `--no-ff` to preserve the feature + docs commits.
+* **Item:** None in-flight. T-4.1b is **merged to `main`** (PR #1, `--no-ff` merge `011901e`). Post-merge pipeline on `main` is green: `npm run lint`, `npm run typecheck`, `npm run typecheck:test`, `npm run build`, `npm test` (152 unit + 45 integration); `npm run test:exthost` (4) passes.
+* **Done:** QA sign-off (`docs/qa/sprint-3-signoff.md`, re-verified after the #2 fix) + the maintainer's §5 EDH spot-check (incl. the #2 delete-mid-debounce repro) — all pass. Defect #2 fixed in `51aea4f` (Fixes #2).
+* **Next:** Sprint 4 = **M4.2 — Hover preview for links** (resolver-backed; builds on this sprint's click primitive).
 
 ---
 
@@ -124,8 +124,8 @@ None of these reverse the architecture; they are scoped placeholders with named 
 
 ## 8. Blockers
 
-* **None.** The full local pipeline is green and T-4.1b is committed on `feature/sprint-3`.
-* **Merge gate:** awaiting QA sign-off (`docs/qa/sprint-3-signoff.md`) + the Producer `--no-ff` merge. The manual EDH (F5) matrix (Phase 8 of the plan) is a QA/post-push item.
+* **None.** T-4.1b is merged to `main` (`011901e`) and the post-merge pipeline is green.
+* **Merge gate:** ✅ cleared — QA sign-off + maintainer §5 EDH spot-check both passed; defect #2 fixed (`51aea4f`).
 
 ---
 
