@@ -104,15 +104,18 @@ The PKM layer — built on the unshakeable core delivered in Phases 0–3.
 
 ---
 
-## Phase 5 — Authoring Workflows · *Planned*
+## Phase 5 — Authoring Workflows · *In progress*
 
 Productivity features for habitual writers.
 
 **Milestones**
-* M5.1 — Templates
-* M5.2 — Snippets
-* M5.3 — Daily notes
-* M5.4 — Workspace-level note features
+* M5.1 — Templates *(Done — Sprint 7; in-tree front-matter + variable engine, native QuickPick, opens created notes in MarkStudio, zero new deps, ADR-0025)*
+* M5.2 — Snippets *(Next — Sprint 8; reuses the `${N}` placeholders the M5.1 expander already passes through verbatim, plus the CM6 integration)*
+* M5.3 — Daily notes *(Done — Sprint 7; one-key `MarkStudio: Open Today's Note` create-or-open over the same engine, ADR-0025)*
+* M5.4 — Workspace-level note features *(Deferred — revisit after Snippets)*
+
+**Exit criteria**
+* Templates and daily notes never overwrite existing files and always open in MarkStudio. *(Met — Sprint 7; create-if-missing, `output:` collision opens the existing file with a status notice, every open routes through `provider.openInMarkStudio`.)*
 
 ---
 

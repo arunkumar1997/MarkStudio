@@ -1,9 +1,11 @@
 import * as vscode from "vscode";
 import { MarkStudioEditorProvider } from "./editor/MarkStudioEditorProvider";
 import { registerCommands } from "./commands/registerCommands";
+import { registerTemplates } from "./commands/registerTemplates";
 import { registerOutline } from "./outline/registerOutline";
 import { registerBacklinks } from "./links/registerBacklinks";
 import { LinkIndexService } from "./links/LinkIndexService";
+import { TemplateService } from "./templates/TemplateService";
 import { GraphService } from "./graph/GraphService";
 import { StateStore } from "./services/StateStore";
 import { ConfigurationService } from "./services/ConfigurationService";
@@ -17,6 +19,7 @@ import { WordCountStatusBar } from "./status/WordCountStatusBar";
 export interface MarkStudioExtensionApi {
   readonly provider: MarkStudioEditorProvider;
   readonly graphService: GraphService;
+  readonly templateService: TemplateService;
 }
 
 // Activation entry point. Registers the MarkStudio custom editor and the
@@ -56,6 +59,13 @@ export function activate(
   const { service: graphService, disposable: graphCommand } =
     GraphService.register(context, provider, linkIndexService);
 
+  // Phase 5 — Templates engine + Daily Notes (M5.1 + M5.3, ADR-0025). A single
+  // host-side service owns both template roots' watchers + async scan; the
+  // commands drive a native QuickPick / InputBox and open created notes in
+  // MarkStudio via `provider.openInMarkStudio`.
+  const templateService = new TemplateService(context, provider);
+  templateService.start();
+
   context.subscriptions.push(
     disposable,
     registerCommands(provider),
@@ -64,13 +74,15 @@ export function activate(
     linkIndexService,
     graphService,
     graphCommand,
+    templateService,
+    registerTemplates(templateService),
     wordCountStatusBar,
     provider.onDidChangeActiveDocument((document) => {
       wordCountStatusBar.setActiveDocument(document);
     })
   );
 
-  return { provider, graphService };
+  return { provider, graphService, templateService };
 }
 
 export function deactivate(): void {

@@ -67,10 +67,10 @@ Each attaches as a CodeMirror 6 extension and/or markdown-it plugin and **degrad
 
 | Feature | Status | Description |
 | ------- | ------ | ----------- |
-| Templates | Future | Reusable note templates. |
-| Snippets | Future | Insertable Markdown snippets. |
-| Daily notes | Future | Date-stamped note creation. |
-| Workspace note features | Future | Workspace-aware note organization. |
+| Templates | Shipped | Create a note from a reusable template via **`MarkStudio: New Note from Template`** — a native QuickPick of available templates → a title `InputBox` → the note is created and opened **in MarkStudio**. A template is a `.md` file with optional `---`-fenced front matter (`kind`, `description`, `output`, `cursor`) and a body of variables; the engine expands a **closed allowlist** (`{{date}}`/`{{time}}`/`{{datetime}}`/`{{title}}`/`{{slug}}`/`{{filename}}`/`{{cursor}}` and `$CURRENT_*`/`$TM_*`/`$WORKSPACE_NAME`/`$CLIPBOARD`) while snippet `${N}` placeholders and unknown tokens pass through verbatim (for M5.2). Templates resolve from a **workspace** root (`markstudio.templates.workspaceFolder`, default `.markstudio/templates`) and a **user** root (`markstudio.templates.userFolder`, default `<globalStorageUri>/templates`) by basename, **workspace wins**; the list is kept live by a debounced `FileSystemWatcher`. Note creation never overwrites — an `output:` collision opens the existing file with a status notice. **`MarkStudio: Create Example Template`** writes an opt-in starter `daily` template so the engine is discoverable. Built from four pure modules + one host service; **zero new runtime deps**, no webview/protocol change (T-7.1, M5.1, ADR-0025). |
+| Snippets | Next | Insertable Markdown snippets (Sprint 8). The M5.1 expander already recognises and preserves `${1}` / `${1:default}` / `${0}` placeholders, so the snippet engine layers on top of the template engine. |
+| Daily notes | Shipped | **`MarkStudio: Open Today's Note`** is a one-key create-or-open of today's daily note — no picker, no prompt. It resolves the configured daily template (`markstudio.dailyNotes.template`, default `daily`) and expands `{{date}}` with `markstudio.dailyNotes.dateFormat` (default `YYYY-MM-DD`); with no daily template it falls back to an empty note under `markstudio.dailyNotes.folder` (default `daily`). Create-if-missing / open-if-exists, always **in MarkStudio**. Shares the M5.1 engine (T-7.3, M5.3, ADR-0025). |
+| Workspace note features | Deferred | Workspace-aware note organization (revisit after Snippets). |
 
 ---
 
