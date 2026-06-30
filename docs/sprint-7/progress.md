@@ -7,7 +7,7 @@
 
 ---
 
-## Status: 🟢 Phase A (design) — COMPLETE · 🟢 Phase B (pure modules) — COMPLETE · � Phase C (service + commands) — COMPLETE · 🟡 Phase D (integration + exthost tests) — NEXT
+## Status: 🟢 Phase A (design) — COMPLETE · 🟢 Phase B (pure modules) — COMPLETE · 🟢 Phase C (service + commands) — COMPLETE · 🟢 Phase D (integration + exthost tests) — COMPLETE · 🟡 Phase E (docs + gate + push) — NEXT
 
 | # | Phase / Task | State | Owner | Notes |
 |---|---|---|---|---|
@@ -21,19 +21,19 @@
 | 7 | `extension.ts` — wire `TemplateService` | ✅ Done | Sage | Singleton `new TemplateService(context, provider)` + `.start()`; pushed to `context.subscriptions`; on `MarkStudioExtensionApi` |
 | 8 | `package.json` — three commands, five settings | ✅ Done | Sage | Commands appear in palette by default; no new keybinding, no new view |
 | 9 | Unit tests — parser / expander / formatter / resolver | 🟢 Done (Phase B) | Ivy | +58 (20 parser + 9 formatter + 20 expander + 12 resolver); unit 316 → 374 |
-| 10 | Integration tests — `TemplateService` watcher round-trip, conflict policy, openExample idempotency | ⬜ Not started | Ivy | Target +5 |
-| 11 | Exthost tests — command registration, `dailyNotes.openToday` create-then-open round-trip, opens in MarkStudio | ⬜ Not started | Ivy | Target +3 |
+| 10 | Integration tests — `TemplateService` watcher round-trip, conflict policy, openExample idempotency | ✅ Done | Ivy | +6 in `test/integration/templateService.test.ts` (scan, watcher rebuild, two-root precedence, expand+create, no-overwrite, openExample idempotent); integration 65 → 71 |
+| 11 | Exthost tests — command registration, `dailyNotes.openToday` create-then-open round-trip, opens in MarkStudio | ✅ Done | Ivy | +3 in `test/exthost/suite/templates.test.ts` (3 commands contributed; openExample writes+opens TabInputCustom; openToday create-then-open idempotent); exthost 13 → 16 |
 | 12 | Docs pass — ADR-0025, design doc, status/handoff/roadmap/todo/features/changelog/architecture | ⬜ Not started | Sage + Remy | Phase E |
 | 13 | Manual F5 matrix (see plan.md §5.13) | ⬜ Not started | Ivy + human | Theme matrix (dark/light/HC) on QuickPick; opens-in-MarkStudio verified |
 
 ## Verification (local)
 
-- `npm run lint` — pending
+- `npm run lint` — ✅ green (Phase D)
 - `npm run typecheck` — ✅ green (Phase C)
-- `npm run typecheck:test` — ✅ green (Phase C)
+- `npm run typecheck:test` — ✅ green (Phase D)
 - `npm run build` — ✅ green (Phase C); webview/mermaid/graph unchanged
-- `npm test` — unit ✅ **374** (316 baseline + 58 Phase B); integration 65 pending re-run
-- `npm run test:exthost` — pending (baseline 13)
+- `npm test` — unit ✅ **374** + integration ✅ **71** (65 baseline + 6)
+- `npm run test:exthost` — ✅ **16** (13 baseline + 3)
 
 ## Commits
 
@@ -42,6 +42,7 @@ _(none yet — first commit will be the plan; ADR-0025 + `design/templates.md` f
 * `1e8ecc0` — docs(sprint-7): ADR-0025 + design/templates.md (Phase A)
 * _(Phase B)_ feat(templates): pure modules — front-matter parser, variable expander, date formatter, two-root resolver + unit tests
 * _(Phase C)_ feat(templates): TemplateService + registerTemplates + extension wiring + package.json commands/settings
+* _(Phase D)_ test(templates): +6 integration (TemplateService scan/watch/create) + widen vscode mock (in-memory fs, watcher, env.clipboard); +3 exthost (commands contributed, openExample + openToday open in MarkStudio)
 
 ## Bundle sizes (running)
 
