@@ -1,4 +1,4 @@
-# AGENT HANDOFF — T-4.1b In-preview wiki-link navigation MERGED to `main` (2026-06-30)
+# AGENT HANDOFF — M4.2 Hover preview for links implemented on `feature/sprint-4` (2026-06-30)
 
 > Overwrite this file at the end of every working session; do not append. The previous handoff is preserved in git history. Template: [.ai/TEMPLATES/HANDOFF.md](../.ai/TEMPLATES/HANDOFF.md).
 >
@@ -9,37 +9,34 @@
 ## Session Metadata
 
 * **Date:** 2026-06-30
-* **Agent / Author:** Producer (Remy) — merge + post-merge docs sync; impl by Dev Team (Sage + Nova), QA by Ivy
-* **Working branch:** `main` (T-4.1b merged from `feature/sprint-3`)
+* **Agent / Author:** Dev Team (Sage — host + messaging + excerpt; Nova — webview hover + card; tests by Ivy)
+* **Working branch:** `feature/sprint-4` (off `main` `a6d48af`)
 * **Last commit on `main`:** `011901e` *(`--no-ff` merge of `feature/sprint-3` / PR #1 — T-4.1b; M4.1 / T-4.1 merged earlier via `79369f2`)*
-* **Branch state:** `feature/sprint-3` (`b45b3ee`) merged into `main` via `--no-ff` (merge `011901e`); regular merge, no squash/rebase.
-* **Prompt used:** ai-team-producer (Sprint 3 close-out)
+* **Branch state:** M4.2 implemented on `feature/sprint-4`; **not merged** (pending QA F5 + Producer merge). The plan is committed; this session adds the implementation + docs commits.
+* **Prompt used:** ai-team-dev (Sprint 4 — M4.2)
 
 ---
 
 ## 1. What Was Completed
 
-Implemented **T-4.1b — In-preview wiki-link navigation** (Phase 4), making the wiki-links the preview already renders (T-3.4) **clickable**: clicking `[[note]]` / `[[note|alias]]` / `[[note#heading]]` in the preview opens the target note in an editor and reveals the heading line — the in-document counterpart to the M4.1 Backlinks panel. The webview detects the click and delegates; the **host** resolves through the **shared M4.1 index** and navigates.
+Implemented **M4.2 — Hover preview for links** (Phase 4), the read-side counterpart to T-4.1b: hovering a rendered wiki-link (`[[note]]` / `[[note#heading]]`) in the **preview** shows, after a short dwell, a floating **hover card** previewing the target — the top of the note, or the section under the heading. The webview detects the hover and delegates; the **host** resolves through the **shared M4.1 resolver**, reads a capped excerpt, and ships it as **Markdown text**; the webview renders it with the **existing** preview renderer into a hover-widget-themed card.
 
-* **`src/messaging/messages.ts` (edited).** New `OpenWikiLinkMessage` (`type: "openWikiLink"`, `target: string`, `heading: string | null`) added to the `WebviewToHostMessage` union, with a boundary-guard case in `isWebviewToHostMessage` (validates `target` is a string, `heading` is string-or-null). The first webview-originated navigation message.
-* **`src/links/linkIndex.ts` (edited).** New **pure** `LinkIndex.resolveForward(fromPath, target): string[]` — a public wrapper over the private `resolveTarget` the backlink build already used. The Backlinks panel and click-navigation now resolve through the **same** code; forward resolution **keeps** the self-match (clicking `[[A]]` in A opens A), unlike the backlink build which drops self.
-* **`src/links/LinkIndexService.ts` (edited).** New `resolveTarget(fromUri, target): vscode.Uri[]` URI wrapper around `resolveForward`.
-* **`src/outline/headings.ts` (edited).** New **pure** `findHeadingLine(text, heading): number` — case-insensitive trimmed exact match on raw heading source; `-1` on miss. Lives with the outline scanner since both reason about heading lines.
-* **`src/links/registerBacklinks.ts` (edited).** Signature changed to `registerBacklinks(provider, service)`; the `LinkIndexService` is now **injected** rather than constructed/started internally (the returned disposable no longer owns the service).
-* **`src/extension.ts` (edited).** Creates the **single** `LinkIndexService`, calls `start()`, injects it into `register()` and `registerBacklinks()`, and disposes it via `context.subscriptions` — one workspace scan + one live index shared by the panel and click-navigation.
-* **`src/editor/MarkStudioEditorProvider.ts` (edited).** Takes the injected `linkIndexService`; adds the `openWikiLink` case to the message-bus switch + a private `async openWikiLink(fromUri, target, heading)` (resolve → **open-first** on ambiguity → `showTextDocument` → reveal heading via `findHeadingLine`; unresolved → `window.setStatusBarMessage(…, 4000)`).
-* **`src/webview/preview/wikiLinkClick.ts` (new).** `registerWikiLinkClicks(previewRoot, bus)`: one **delegated** `click` listener on the persistent preview pane using `Element.closest('a.markstudio-wikilink')`, reading `data-wikilink-target` / `data-wikilink-heading`, `preventDefault()`, and posting `openWikiLink`. Survives every incremental preview patch (ADR-0002).
-* **`src/webview/main.ts` (edited).** Mounts `registerWikiLinkClicks(shell.previewPane, bus)` after scroll-sync.
-* **Tests.** Unit 132 → 152 (`resolveForward` in `test/links/linkIndex.test.ts`, `findHeadingLine` in `test/outline/headings.test.ts`, the `openWikiLink` guard in `test/messaging/messages.test.ts`); integration 39 → 45 (`test/integration/wikiLinkClick.test.ts` — the click → message seam); exthost 4. All green.
-* **Documentation pass:** [design/wiki-navigation.md](design/wiki-navigation.md) (new), **ADR-0021** in [DECISIONS.md](DECISIONS.md), `openWikiLink` documented in [api/message-protocol.md](api/message-protocol.md), [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md), [ROADMAP.md](ROADMAP.md) (T-4.1b under M4.1), [TODO.md](TODO.md) (T-4.1b → Done), [ARCHITECTURE.md](ARCHITECTURE.md), [PROJECT_STATUS.md](PROJECT_STATUS.md), [sprint-3/progress.md](sprint-3/progress.md), and this handoff.
+* **`src/messaging/messages.ts` (edited).** New `RequestLinkPreviewMessage` (`type: "requestLinkPreview"`, `target: string`, `heading: string | null`) on the `WebviewToHostMessage` union — boundary-guarded in `isWebviewToHostMessage` (the guard case is merged with `openWikiLink`, identical shape). New `LinkPreviewContentMessage` (`type: "linkPreviewContent"`, `target`, `heading`, `status: "ok" | "missing"`, `text?`, `title?`) on the `HostToWebviewMessage` union, guarded in `isHostToWebviewMessage` (validates `status`, and `text`/`title` as string-or-undefined). Plain JSON only.
+* **`src/links/linkExcerpt.ts` (new, pure).** `extractExcerpt(text, heading)` — when a `#heading` is present it slices that heading's section (heading line → next same-or-higher heading) reusing `parseHeadings` / `findHeadingLine`, else the top of the note; then caps to `MAX_EXCERPT_LINES` (60) / `MAX_EXCERPT_CHARS` (2,000), whichever bites first; a heading-miss falls back to the top. No `vscode`/fs/DOM.
+* **`src/editor/MarkStudioEditorProvider.ts` (edited).** Adds the `requestLinkPreview` case to the message-bus switch + a private `async requestLinkPreview(bus, fromUri, target, heading)`: resolve via the injected `linkIndexService.resolveTarget` (open-first); no match → post `{ status: "missing" }`; else `openTextDocument(...).getText()` → `extractExcerpt` → post `{ status: "ok", text, title }` with `title` from the URI basename (a new module helper `noteTitle`). Wrapped in try/catch, degrading to `"missing"` on any read failure (never an unhandled rejection — the defect #2 lesson).
+* **`src/webview/preview/wikiLinkHover.ts` (new).** `registerWikiLinkHover(previewRoot, bus, options)`: one **delegated** `pointerover`/`pointerout` pair on the persistent preview pane (`Element.closest('a.markstudio-wikilink')`); ~300 ms dwell → post `requestLinkPreview`; cancel-on-leave + `onRequestHide`; re-enter → `onCancelHide`. Exposes `getActiveAnchor()` / `matchesActiveRequest(target, heading)` so `main.ts` can drop stale replies. No per-anchor listeners.
+* **`src/webview/preview/HoverCard.ts` (new).** `createHoverCard({ parent })`: one persistent floating card; `showContent` / `showMissing` / `hide` / `scheduleHide` (grace) / `cancelHide`; position below the anchor (flipping above near the viewport bottom, clamped horizontally); themed with `--vscode-editorHoverWidget-*`; dismiss on pointer-leave (with grace), card `pointerleave`, scroll, click outside, and Escape. The excerpt renders into `contentElement` via a reused `PreviewRenderer`.
+* **`src/webview/main.ts` (edited).** Mounts `createHoverCard({ parent: root })` + a dedicated `PreviewRenderer` in the card + `registerWikiLinkHover(shell.previewPane, bus, …)` next to `registerWikiLinkClicks`; routes `linkPreviewContent` to the card (render `text` on `"ok"`, fallback on `"missing"`) and **drops stale replies** (compares `target`/`heading` against the still-hovered anchor); threads `configChanged` into the card's renderer.
+* **Tests.** Unit 152 → 172 (`extractExcerpt` in `test/links/linkExcerpt.test.ts` — top, heading slice, nested-section stop, heading-miss → top, line + char caps; the `requestLinkPreview` + `linkPreviewContent` guards in `test/messaging/messages.test.ts`); integration 45 → 52 (`test/integration/wikiLinkHover.test.ts` — dwell → `requestLinkPreview`, empty-target no-op, cancel-on-leave, active-anchor/stale tracking; card render via the reused renderer, missing fallback, Escape dismiss); exthost 4. All green. **Note:** under jsdom, `window.setTimeout` must be cancelled with `window.clearTimeout` (the global `clearTimeout` does not cancel a jsdom window timer) — fixed in `wikiLinkHover.ts` / `HoverCard.ts`.
+* **Documentation pass:** [design/wiki-hover.md](design/wiki-hover.md) (new), **ADR-0022** in [DECISIONS.md](DECISIONS.md), both messages in [api/message-protocol.md](api/message-protocol.md), [CHANGELOG.md](CHANGELOG.md), [FEATURES.md](FEATURES.md) (Hover preview → Shipped), [ROADMAP.md](ROADMAP.md) (M4.2 → Done), [TODO.md](TODO.md) (M4.2 → Done), [ARCHITECTURE.md](ARCHITECTURE.md), [PROJECT_STATUS.md](PROJECT_STATUS.md), [sprint-4/progress.md](sprint-4/progress.md), and this handoff.
 
 ---
 
 ## 2. Current Work In Progress
 
-* **Item:** None in-flight. T-4.1b is **merged to `main`** (PR #1, `--no-ff` merge `011901e`). Post-merge pipeline on `main` is green: `npm run lint`, `npm run typecheck`, `npm run typecheck:test`, `npm run build`, `npm test` (152 unit + 45 integration); `npm run test:exthost` (4) passes.
-* **Done:** QA sign-off (`docs/qa/sprint-3-signoff.md`, re-verified after the #2 fix) + the maintainer's §5 EDH spot-check (incl. the #2 delete-mid-debounce repro) — all pass. Defect #2 fixed in `51aea4f` (Fixes #2).
-* **Next:** Sprint 4 = **M4.2 — Hover preview for links** (resolver-backed; builds on this sprint's click primitive).
+* **Item:** None in-flight. M4.2 is implemented on `feature/sprint-4` and the local pipeline is green: `npm run lint`, `npm run typecheck`, `npm run typecheck:test`, `npm run build`, `npm test` (172 unit + 52 integration); `npm run test:exthost` (4).
+* **Not done (Producer/QA):** `docs/sprint-4/done.md`, `docs/qa/sprint-4-signoff.md`, the manual **F5 EDH matrix** (plan §9 — hover `[[note]]` / `[[note#heading]]`, missing/ambiguous, dismiss on leave/scroll/Esc, dark/light/high-contrast, toggle `wikiLinks` off), and the `--no-ff` merge to `main`.
+* **Next:** QA F5 + sign-off, then Producer merge; then **M4.3 — Embedded notes / transclusion**.
 
 ---
 
@@ -59,29 +56,25 @@ ADR-0021 follow-ups (in-preview navigation refinements): quick-pick disambiguati
 
 | File | Change | Notes |
 | ---- | ------ | ----- |
-| `src/messaging/messages.ts` | Edited | `OpenWikiLinkMessage` + union member + boundary guard |
-| `src/links/linkIndex.ts` | Edited | Pure `resolveForward(fromPath, target)` (keeps self-match) |
-| `src/links/LinkIndexService.ts` | Edited | `resolveTarget(fromUri, target): vscode.Uri[]` URI wrapper |
-| `src/outline/headings.ts` | Edited | Pure `findHeadingLine(text, heading): number` |
-| `src/links/registerBacklinks.ts` | Edited | Signature → `registerBacklinks(provider, service)`; service injected |
-| `src/extension.ts` | Edited | Single `LinkIndexService` created + `start()` + injected + disposed |
-| `src/editor/MarkStudioEditorProvider.ts` | Edited | `openWikiLink` bus case + private `async openWikiLink()` |
-| `src/webview/preview/wikiLinkClick.ts` | New | Delegated `[[link]]` click → `openWikiLink` message |
-| `src/webview/main.ts` | Edited | Mounts `registerWikiLinkClicks(previewPane, bus)` |
-| `test/links/linkIndex.test.ts` | Edited | `resolveForward` describe block (9 tests) |
-| `test/outline/headings.test.ts` | Edited | `findHeadingLine` describe block (6 tests) |
-| `test/messaging/messages.test.ts` | Edited | `openWikiLink` guard describe block (5 tests) |
-| `test/integration/wikiLinkClick.test.ts` | New | Click → message seam (6 tests) |
-| `docs/design/wiki-navigation.md` | New | Design note |
-| `docs/DECISIONS.md` | Edited | ADR-0021 + index row |
-| `docs/api/message-protocol.md` | Edited | `openWikiLink` documented; T-4.1 note updated |
-| `docs/CHANGELOG.md` | Edited | New T-4.1b Added entry |
-| `docs/FEATURES.md` | Edited | In-preview navigation → Shipped; Wiki links row updated |
-| `docs/ROADMAP.md` | Edited | T-4.1b under M4.1 |
-| `docs/TODO.md` | Edited | T-4.1b → Done; active block removed |
-| `docs/ARCHITECTURE.md` | Edited | `wikiLinkClick.ts` in the tree + component rows |
-| `docs/PROJECT_STATUS.md` | Rewritten | Snapshot for T-4.1b |
-| `docs/sprint-3/progress.md` | Edited | Phases marked done |
+| `src/messaging/messages.ts` | Edited | `RequestLinkPreviewMessage` (W→H) + `LinkPreviewContentMessage` (H→W) + union members + boundary guards |
+| `src/links/linkExcerpt.ts` | New | Pure `extractExcerpt(text, heading)` — heading-section slice / top, capped (60 lines / 2,000 chars) |
+| `src/editor/MarkStudioEditorProvider.ts` | Edited | `requestLinkPreview` bus case + private `async requestLinkPreview()`; `noteTitle` helper |
+| `src/webview/preview/wikiLinkHover.ts` | New | Delegated `[[link]]` hover (dwell) → `requestLinkPreview`; active-anchor / stale tracking |
+| `src/webview/preview/HoverCard.ts` | New | Floating hover-preview card: position, theme, render via `PreviewRenderer`, show/fallback/hide/dismiss |
+| `src/webview/main.ts` | Edited | Mounts hover + card; routes `linkPreviewContent`; drops stale replies; `configChanged` → card renderer |
+| `test/links/linkExcerpt.test.ts` | New | `extractExcerpt` unit tests (top, heading slice, nested stop, miss, caps) |
+| `test/messaging/messages.test.ts` | Edited | `requestLinkPreview` + `linkPreviewContent` guard describe blocks |
+| `test/integration/wikiLinkHover.test.ts` | New | Hover → request seam + HoverCard render/fallback/dismiss |
+| `docs/design/wiki-hover.md` | New | Design note |
+| `docs/DECISIONS.md` | Edited | ADR-0022 + index row |
+| `docs/api/message-protocol.md` | Edited | `requestLinkPreview` + `linkPreviewContent` documented |
+| `docs/CHANGELOG.md` | Edited | New M4.2 Added entry |
+| `docs/FEATURES.md` | Edited | Hover preview → Shipped |
+| `docs/ROADMAP.md` | Edited | M4.2 → Done |
+| `docs/TODO.md` | Edited | M4.2 → Done; intro line updated |
+| `docs/ARCHITECTURE.md` | Edited | `wikiLinkHover.ts` / `HoverCard.ts` / `linkExcerpt.ts` in the tree + component rows |
+| `docs/PROJECT_STATUS.md` | Rewritten | Snapshot for M4.2 |
+| `docs/sprint-4/progress.md` | Edited | Phases marked done |
 | `docs/AGENT_HANDOFF.md` | Rewritten | This file |
 
 `dist/`, `dist-test/`, and `.vscode-test/` are build/download artifacts (git-ignored), not committed.
@@ -112,11 +105,13 @@ ADR-0021 follow-ups (in-preview navigation refinements): quick-pick disambiguati
 
 ## 7. Technical Debt Introduced
 
-* **Open-first on ambiguous basenames** — no quick-pick disambiguation (ADR-0021 follow-up).
-* **Unresolved targets only surface in the status bar** — no click-to-create (ADR-0021 follow-up).
-* **Same-document `[[#heading]]` links are inert** this sprint (empty `target`).
-* **`findHeadingLine` is an exact match on raw source** — inline-Markdown headings don't navigate (slugify follow-up).
-* **Carried over from earlier sessions:** wiki-links-only backlinks (T-4.1a); file-level `#heading` grouping in the panel (T-4.1c); multi-root path-key collisions; Mermaid live re-theme (T-3.2); always-bundled KaTeX cost (T-3.1); `applyEdit` / `error` / `StateStore.update` failures are console-only; layout/toggle/focus commands and the word-count indicator target only the active webview; the find panel is keyboard-only; `StateStore` Memento entries accumulate forever; scroll-sync interpolates linearly across very tall blocks (T-2.1); the document outline shows raw heading source text (T-2.2); task-list checkboxes are read-only (T-3.5).
+* **Hover card is a static snapshot** taken at hover time — no live update while the target file changes (ADR-0022 follow-up).
+* **Open-first on ambiguous basenames** for the preview — no quick-pick (shared with click-nav, ADR-0021/0022).
+* **No nested hover** — a wiki-link inside a hover card does not itself preview (deferred).
+* **Preview-pane only** — no CodeMirror source-pane hover (separate seam, deferred).
+* **No excerpt cache / prefetch** — resolution + read happen once per hover after the dwell (ADR-0022 follow-up).
+* **No own setting** — gated by `markstudio.preview.wikiLinks`; an optional `markstudio.preview.linkHoverPreview` is deferred (plan §9).
+* **Carried over from earlier sessions:** open-first on ambiguous basenames + status-bar-only unresolved targets + inert same-document `[[#heading]]` + raw-source `findHeadingLine` for navigation (T-4.1b); wiki-links-only backlinks (T-4.1a); file-level `#heading` grouping in the panel (T-4.1c); multi-root path-key collisions; Mermaid live re-theme (T-3.2); always-bundled KaTeX cost (T-3.1); `applyEdit` / `error` / `StateStore.update` failures are console-only; layout/toggle/focus commands and the word-count indicator target only the active webview; the find panel is keyboard-only; `StateStore` Memento entries accumulate forever; scroll-sync interpolates linearly across very tall blocks (T-2.1); the document outline shows raw heading source text (T-2.2); task-list checkboxes are read-only (T-3.5).
 
 None of these reverse the architecture; they are scoped placeholders with named successors.
 
@@ -124,8 +119,8 @@ None of these reverse the architecture; they are scoped placeholders with named 
 
 ## 8. Blockers
 
-* **None.** T-4.1b is merged to `main` (`011901e`) and the post-merge pipeline is green.
-* **Merge gate:** ✅ cleared — QA sign-off + maintainer §5 EDH spot-check both passed; defect #2 fixed (`51aea4f`).
+* **None.** M4.2 is implemented on `feature/sprint-4` and the local pipeline is green.
+* **Merge gate:** ⏳ open — pending QA F5 sign-off (`docs/qa/sprint-4-signoff.md`) + the Producer `--no-ff` merge.
 
 ---
 
@@ -134,14 +129,14 @@ None of these reverse the architecture; they are scoped placeholders with named 
 * [x] `npm run lint` — ESLint clean (`--max-warnings 0`) + `prettier --check .` clean
 * [x] `npm run typecheck` (strict, `src`) passes
 * [x] `npm run typecheck:test` (strict, `src` + `test`) passes
-* [x] `npm run build` passes — host bundle **~40.4 KB → ~44.0 KB** (+~3.6 KB for the resolver wiring + click handler); webview seam unchanged
-* [x] `npm test` passes — **197 tests** (152 unit + 45 integration, `node:test`)
+* [x] `npm run build` passes — host bundle **~44.0 KB → ~47.6 KB** (+~3.6 KB for the excerpt extractor + hover handler); webview reuses its existing renderer
+* [x] `npm test` passes — **224 tests** (172 unit + 52 integration, `node:test`)
 * [x] `npm run test:exthost` passes — 4 Extension Host lifecycle tests
-* [ ] **Manual verification in an Extension Development Host (F5)** — **pending QA** (Phase 8 matrix): click `[[B]]` from A opens B; `[[B#Heading]]` reveals the heading line; ambiguous basename opens the first match; unresolved target shows a status-bar message; same-document `[[#heading]]` is inert; toggling `markstudio.preview.wikiLinks` off removes the links
-* [x] Webview is not recreated (one delegated listener on the persistent pane; navigation is a `postMessage`, not a reload)
+* [ ] **Manual verification in an Extension Development Host (F5)** — **pending QA** (plan §9 matrix): hover `[[B]]` shows the top of B; `[[B#Heading]]` shows that section; `[[B|alias]]` still previews B; ambiguous basename previews the first match; missing target → quiet "No note found" card; dismiss on leave / scroll / click / Esc; dark / light / high-contrast; toggling `markstudio.preview.wikiLinks` off removes the links (and the feature)
+* [x] Webview is not recreated (one delegated hover pair + one persistent card on the persistent pane; preview is a `postMessage`, not a reload)
 * [x] CodeMirror state preserved (unchanged this session)
-* [x] New typed `openWikiLink` message is boundary-validated
-* [ ] **CI run on GitHub** — pending the `feature/sprint-3` push/PR
+* [x] New `requestLinkPreview` / `linkPreviewContent` messages are boundary-validated; host ships Markdown **text**, webview renders with `html: false`
+* [ ] **CI run on GitHub** — pending the `feature/sprint-4` push/PR
 
 ---
 
