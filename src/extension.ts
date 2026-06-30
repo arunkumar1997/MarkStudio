@@ -8,10 +8,21 @@ import { StateStore } from "./services/StateStore";
 import { ConfigurationService } from "./services/ConfigurationService";
 import { WordCountStatusBar } from "./status/WordCountStatusBar";
 
+// The activation API surface. Currently used only by the Extension Host
+// navigation tests so they can drive the provider's open paths directly (the
+// in-preview click is webview-originated and not reachable from a host test).
+// Not contributed to consumers and intentionally undocumented as a stable
+// extension API.
+export interface MarkStudioExtensionApi {
+  readonly provider: MarkStudioEditorProvider;
+}
+
 // Activation entry point. Registers the MarkStudio custom editor and the
 // commands that drive it. Per ARCHITECTURE.md §4.1, this file only wires
 // things together and contains no editor or rendering logic.
-export function activate(context: vscode.ExtensionContext): void {
+export function activate(
+  context: vscode.ExtensionContext
+): MarkStudioExtensionApi {
   const stateStore = new StateStore(context.workspaceState);
   const configService = new ConfigurationService();
 
@@ -47,6 +58,8 @@ export function activate(context: vscode.ExtensionContext): void {
       wordCountStatusBar.setActiveDocument(document);
     })
   );
+
+  return { provider };
 }
 
 export function deactivate(): void {

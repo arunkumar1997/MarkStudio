@@ -240,12 +240,36 @@ export interface RequestLinkPreviewMessage {
   readonly heading: string | null;
 }
 
+// The webview reports that the user clicked a standard markdown link
+// (`[label](./Other.md)`) inside the preview whose href resolves to a
+// workspace `.md` / `.markdown` file (ADR-0021 2026-06-30 amendment, extended
+// for standard markdown links). A single delegated listener on the preview
+// pane classifies the href (`isExternalHref` / `parseLocalMarkdownHref` in
+// `src/webview/preview/markdownLinkClick.ts`), calls `preventDefault`, and
+// posts this. The host resolves `target` relative to the active document's
+// URI (or against the source's workspace folder for a workspace-absolute
+// `/path`) and opens the note **in MarkStudio** via `openInMarkStudio`,
+// revealing the `heading` line via the pending-reveal handshake. `href` is the
+// raw attribute value as it appeared in the preview, kept so the host can
+// surface it in a transient status-bar message when the path does not resolve.
+// `target` is the URL-decoded path part (before `#`); `heading` is the
+// URL-decoded fragment or `null`. All three are untrusted strings validated at
+// the bus boundary before the host acts. External-scheme hrefs are filtered
+// out webview-side, so this message never carries one.
+export interface OpenMarkdownLinkMessage {
+  readonly type: "openMarkdownLink";
+  readonly href: string;
+  readonly target: string;
+  readonly heading: string | null;
+}
+
 export type WebviewToHostMessage =
   | ReadyMessage
   | EditMessage
   | LayoutModeChangedMessage
   | OpenWikiLinkMessage
   | RequestLinkPreviewMessage
+  | OpenMarkdownLinkMessage
   | ErrorMessage;
 
 // ─── Boundary guards ────────────────────────────────────────────────────────
@@ -363,6 +387,12 @@ export function isWebviewToHostMessage(
     case "openWikiLink":
     case "requestLinkPreview":
       return (
+        typeof value.target === "string" &&
+        (value.heading === null || typeof value.heading === "string")
+      );
+    case "openMarkdownLink":
+      return (
+        typeof value.href === "string" &&
         typeof value.target === "string" &&
         (value.heading === null || typeof value.heading === "string")
       );

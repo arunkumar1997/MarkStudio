@@ -10,8 +10,9 @@ import {
 // Wires the backlinks panel (T-4.1, M4.1): a native tree view backed by
 // `BacklinksTreeProvider` over a workspace-wide `LinkIndexService`. It follows
 // the active MarkStudio editor, refreshes as the link index changes, and opens
-// the source note at the linking line when a backlink is clicked. Returns a
-// single disposable owning every registration (mirrors `registerOutline`).
+// the source note in MarkStudio at the linking line when a backlink is clicked
+// (ADR-0021). Returns a single disposable owning every registration (mirrors
+// `registerOutline`).
 //
 // The `LinkIndexService` is **injected** (owned by `extension.ts`) so the same
 // index backs both this panel and in-preview wiki-link navigation (T-4.1b)
@@ -56,7 +57,7 @@ export function registerBacklinks(
     BACKLINKS_COMMAND_IDS.open,
     (uri: unknown, line: unknown) => {
       if (uri instanceof vscode.Uri && typeof line === "number") {
-        void openSourceAtLine(uri, line);
+        void openSourceInMarkStudio(provider, uri, line);
       }
     }
   );
@@ -72,16 +73,30 @@ export function registerBacklinks(
   );
 }
 
-// Open the source note in a plain text editor and reveal the linking line. The
-// custom editor is registered at `priority: "option"`, so `showTextDocument`
-// opens the built-in text editor (which honours `selection`) rather than the
-// MarkStudio webview — the reliable way to reveal a specific line in a file the
-// user is navigating *to*.
-async function openSourceAtLine(uri: vscode.Uri, line: number): Promise<void> {
-  const document = await vscode.workspace.openTextDocument(uri);
-  const safeLine = Math.max(0, Math.min(line, document.lineCount - 1));
-  const position = new vscode.Position(safeLine, 0);
-  await vscode.window.showTextDocument(document, {
-    selection: new vscode.Range(position, position)
-  });
+// Open the source note in MarkStudio and reveal the linking line. Click-
+// navigation and the Backlinks panel both open `.md` targets in the MarkStudio
+// custom editor — the markdown experience — rather than the built-in text
+// editor (ADR-0021). Because a MarkStudio editor is a webview, the line cannot
+// ride `showTextDocument`'s `selection`; the provider reveals it through a
+// host → webview `revealLine` message (the pending-reveal handshake), focusing
+// the existing editor when the note is already open. The line is clamped to the
+// source document here, where its length is known. Degrades to a transient
+// status-bar message if the source fails to open (e.g. it was deleted inside
+// the watcher debounce window, so the index still lists it); never throws — the
+// caller invokes it fire-and-forget via `void`.
+async function openSourceInMarkStudio(
+  provider: MarkStudioEditorProvider,
+  uri: vscode.Uri,
+  line: number
+): Promise<void> {
+  try {
+    const document = await vscode.workspace.openTextDocument(uri);
+    const safeLine = Math.max(0, Math.min(line, document.lineCount - 1));
+    await provider.openInMarkStudio(uri, safeLine);
+  } catch {
+    void vscode.window.setStatusBarMessage(
+      "MarkStudio: could not open the source note.",
+      4000
+    );
+  }
 }
