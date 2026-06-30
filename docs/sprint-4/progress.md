@@ -6,7 +6,7 @@
 
 ---
 
-## Status: DONE (dev) — implementation + tests + docs complete; awaiting QA F5 sign-off + Producer merge (2026-06-30)
+## Status: ✅ MERGED to `main` (PR #3, `--no-ff`) — M4.2 complete; automated 228 PASS + human F5 hover matrix verified (2026-06-30)
 
 | # | Phase / Task | State | Owner | Notes |
 |---|---|---|---|---|
@@ -18,7 +18,7 @@
 | 6 | `main.ts` wiring + route `linkPreviewContent`; ignore stale responses | ✅ Done | Nova | latest-target guard |
 | 7 | ADR-0022 + `design/wiki-hover.md` | ✅ Done | Sage + Producer | text-not-HTML; two new messages |
 | 8 | Unit + integration tests (excerpt, guard, hover→request seam, content→card) | ✅ Done | Ivy | unit 152→172 (+20); integration 45→52 (+7) |
-| 9 | Manual EDH (F5): hover matrix, missing/ambiguous, dismiss, theme matrix, toggle off | ☐ Todo | Ivy | human-only spot-check |
+| 9 | Manual EDH (F5): hover matrix, missing/ambiguous, dismiss, theme matrix, toggle off | ✅ Done | Ivy + human | F5 hover matrix verified working by human (2026-06-30) |
 | 10 | Docs pass + TODO M4.2 → Done + QA sign-off | ✅ Done (docs) | Sage + Producer | `api/message-protocol.md`, CHANGELOG, FEATURES, ROADMAP, TODO, ARCHITECTURE, PROJECT_STATUS, AGENT_HANDOFF; QA sign-off is Ivy's |
 
 ## Verification (local)
@@ -27,7 +27,9 @@
 
 ## Commits
 * `31c061e` — `feat: hover preview for wiki-links in the preview (M4.2)` (implementation + tests)
-* docs commit — Phase 7/10 documentation pass (ADR-0022, design note, message protocol, status/handoff, etc.)
+* `24ddb94` — `docs: record M4.2 hover preview for links (ADR-0022)`
+* `7df2b79` — `docs(qa): Sprint 4 M4.2 sign-off (automated PASS; F5 matrix pending human)`
+* Merge `--no-ff` into `main` (PR #3) — post-merge gate green (lint/typecheck/build, 172 unit + 52 integration).
 
 ## Decisions log
 * 2026-06-30 — Producer: host returns markdown **text**, not HTML; the webview renders it (theming + `html: false` safety + consistency).

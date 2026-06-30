@@ -1,4 +1,4 @@
-# AGENT HANDOFF — M4.2 Hover preview for links implemented on `feature/sprint-4` (2026-06-30)
+# AGENT HANDOFF — M4.2 Hover preview for links MERGED to `main` (2026-06-30)
 
 > Overwrite this file at the end of every working session; do not append. The previous handoff is preserved in git history. Template: [.ai/TEMPLATES/HANDOFF.md](../.ai/TEMPLATES/HANDOFF.md).
 >
@@ -9,11 +9,11 @@
 ## Session Metadata
 
 * **Date:** 2026-06-30
-* **Agent / Author:** Dev Team (Sage — host + messaging + excerpt; Nova — webview hover + card; tests by Ivy)
-* **Working branch:** `feature/sprint-4` (off `main` `a6d48af`)
-* **Last commit on `main`:** `011901e` *(`--no-ff` merge of `feature/sprint-3` / PR #1 — T-4.1b; M4.1 / T-4.1 merged earlier via `79369f2`)*
-* **Branch state:** M4.2 implemented on `feature/sprint-4`; **not merged** (pending QA F5 + Producer merge). The plan is committed; this session adds the implementation + docs commits.
-* **Prompt used:** ai-team-dev (Sprint 4 — M4.2)
+* **Agent / Author:** Dev Team (Sage — host + messaging + excerpt; Nova — webview hover + card; tests by Ivy); merged by the Producer (Remy)
+* **Working branch:** `feature/sprint-4` (off `main` `a6d48af`) — **merged & closed** (PR #3)
+* **Last commit on `main`:** `8bf1a86` *(`--no-ff` merge of `feature/sprint-4` / PR #3 — M4.2; T-4.1b via `011901e`, M4.1 / T-4.1 via `79369f2`)*
+* **Branch state:** M4.2 **merged to `main`** (PR #3). Automated 228 PASS + human F5 hover matrix verified. QA sign-off in [qa/sprint-4-signoff.md](qa/sprint-4-signoff.md).
+* **Prompt used:** ai-team-dev (Sprint 4 — M4.2); ai-team-qa (sign-off); ai-team-producer (merge)
 
 ---
 
@@ -34,9 +34,9 @@ Implemented **M4.2 — Hover preview for links** (Phase 4), the read-side counte
 
 ## 2. Current Work In Progress
 
-* **Item:** None in-flight. M4.2 is implemented on `feature/sprint-4` and the local pipeline is green: `npm run lint`, `npm run typecheck`, `npm run typecheck:test`, `npm run build`, `npm test` (172 unit + 52 integration); `npm run test:exthost` (4).
-* **Not done (Producer/QA):** `docs/sprint-4/done.md`, `docs/qa/sprint-4-signoff.md`, the manual **F5 EDH matrix** (plan §9 — hover `[[note]]` / `[[note#heading]]`, missing/ambiguous, dismiss on leave/scroll/Esc, dark/light/high-contrast, toggle `wikiLinks` off), and the `--no-ff` merge to `main`.
-* **Next:** QA F5 + sign-off, then Producer merge; then **M4.3 — Embedded notes / transclusion**.
+* **Item:** None in-flight. M4.2 is **merged to `main`** (PR #3, `--no-ff` `8bf1a86`); post-merge pipeline green: `npm run lint`, `npm run typecheck`, `npm run build`, `npm test` (172 unit + 52 integration); `npm run test:exthost` (4).
+* **Done (Producer/QA):** [qa/sprint-4-signoff.md](qa/sprint-4-signoff.md) (automated PASS), the manual **F5 EDH matrix** (verified working by human), [sprint-4/done.md](sprint-4/done.md), and the `--no-ff` merge to `main`.
+* **Next:** **M4.3 — Embedded notes / transclusion**.
 
 ---
 
