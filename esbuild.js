@@ -1,7 +1,9 @@
 // Build script for MarkStudio.
-// Bundles two independent targets with esbuild (ADR-0006):
+// Bundles independent targets with esbuild (ADR-0006):
 //   1. The extension host entry (Node, CommonJS, `vscode` kept external).
-//   2. The webview entry (browser, IIFE) loaded inside the custom editor.
+//   2. The editor webview entry (browser, IIFE) loaded inside the custom editor.
+//   3. The Mermaid lazy bundle (browser, IIFE) — preview-only, ADR-0016.
+//   4. The Graph View webview entry (browser, IIFE) — M4.4, ADR-0023.
 // Also copies the @vscode/codicons font + stylesheet into `dist/codicons/`
 // so the webview can load them through `asWebviewUri` for the toolbar (T-107).
 const esbuild = require("esbuild");
@@ -55,6 +57,20 @@ const mermaidConfig = {
   target: "es2022"
 };
 
+// The M4.4 Graph View panel runs in its own free-standing webview, with its
+// own bundle (ADR-0023). Keeping it separate from `webview.js` means users
+// who never open the graph pay zero bytes for it, and the editor webview's
+// boot path is untouched.
+/** @type {import('esbuild').BuildOptions} */
+const graphConfig = {
+  ...shared,
+  entryPoints: ["src/webview/graph/main.ts"],
+  outfile: "dist/graph.js",
+  platform: "browser",
+  format: "iife",
+  target: "es2022"
+};
+
 async function build() {
   copyCodiconAssets();
   copyKatexAssets();
@@ -63,7 +79,8 @@ async function build() {
     const contexts = await Promise.all([
       esbuild.context(hostConfig),
       esbuild.context(webviewConfig),
-      esbuild.context(mermaidConfig)
+      esbuild.context(mermaidConfig),
+      esbuild.context(graphConfig)
     ]);
     await Promise.all(contexts.map((ctx) => ctx.watch()));
     console.log("[markstudio] watching for changes...");
@@ -73,7 +90,8 @@ async function build() {
   await Promise.all([
     esbuild.build(hostConfig),
     esbuild.build(webviewConfig),
-    esbuild.build(mermaidConfig)
+    esbuild.build(mermaidConfig),
+    esbuild.build(graphConfig)
   ]);
   console.log("[markstudio] build complete");
 }

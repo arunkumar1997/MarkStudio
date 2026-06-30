@@ -1136,3 +1136,78 @@ Not a migration. The webview mounts `registerWikiLinkHover(previewPane, bus, …
 * [api/message-protocol.md](api/message-protocol.md) — `requestLinkPreview` / `linkPreviewContent`
 * [ROADMAP.md](ROADMAP.md) — Phase 4
 * [TODO.md](TODO.md) — M4.2
+
+---
+
+## ADR-0023: Graph view: host-side pure model + lazy webview canvas, zero new runtime deps
+
+### Status
+`Accepted`
+
+### Date
+2026-06-30
+
+### Context
+**M4.4** (Phase 4, closing) is the **graph view**: an interactive workspace-wide visualisation of every `.md` note as a node and every wiki-link as an edge — the vault-wide topology Backlinks (M4.1), in-preview click-nav (T-4.1b), and hover preview (M4.2) only show per-note. The link index (ADR-0020), the `provider.openInMarkStudio` navigation handshake (PR #4, ADR-0021 amendments), the lazy-bundle pattern for heavy webview features (Mermaid, ADR-0016), and the persistent-webview discipline (ADR-0002) all already exist. What is new is (a) a workspace-wide **read** seam over the existing index, (b) a **new webview surface** that is not the editor's preview (it has no document backing it), and (c) **rendering + simulation** of an arbitrary graph at interactive frame rates.
+
+Three project-specific questions had to be settled: (1) **what library, if any**, should render and simulate the graph (the obvious candidates — `d3-force`, `cytoscape.js`, `vis-network` — all add real bundle and theming weight); (2) **what surface** the graph lives in (editor preview, custom editor view type, or a free-standing webview panel); and (3) **where the simulation runs** (host, webview main thread, webview worker), since a vault can have hundreds of notes.
+
+### Decision
+1. **Host-side pure graph model + lazy webview Canvas2D panel, zero new runtime dependencies.** A single new `vscode.WebviewPanel` (`GraphService`, mirroring the pattern of `registerBacklinks` but with a panel instead of a tree view), opened by a new `markstudio.graph.show` command, hosts the visualisation. The body is rendered with **Canvas2D**; labels are **DOM-positioned `<span>`s** so VS Code text rendering applies. The simulation is a **hand-rolled Fruchterman–Reingold integrator** in a pure `forceSimulation.ts`. No `d3-force`, no `cytoscape.js`, no `vis-network`. ADR-0005 (vanilla TS/HTML/CSS) holds.
+2. **Edges come from the existing link index via one tiny additive getter.** `LinkIndex.allEdges(): { from, to }[]` exposes the (from→to) pairs the reverse-index build loop already computes internally; `LinkIndexService` adds `getEdges()`, `getNotePaths()`, and `uriFor(path)`. No second parse, no second resolver, no second watcher. One index serves Backlinks, click-nav, hover preview, **and** the graph.
+3. **A free-standing `vscode.WebviewPanel`, not a custom editor.** A custom editor view type would need a document to back it; the graph is workspace-wide and orthogonal to any one note. The panel honours `retainContextWhenHidden: true` (ADR-0002 applied to a non-editor webview); a second `markstudio.graph.show` reveals the existing panel rather than creating a duplicate.
+4. **Lazy third esbuild bundle (`dist/graph.js`).** The graph entry (`src/webview/graph/main.ts` + `render.ts` + `forceSimulation.ts`) is bundled separately and only loaded when the panel opens, mirroring the Mermaid pattern (ADR-0016). The editor webview's `dist/webview.js` is **untouched** by this sprint — the graph cannot inflate the cost of opening a single `.md`.
+5. **Two new typed, guarded messages.** `graphData { nodes, edges, currentPath }` (host → webview) is posted whenever the index changes (debounced ~250 ms) or the active MarkStudio editor changes (immediate). `openGraphNode { path }` (webview → host) is boundary-guarded exactly like `openWikiLink` / `openMarkdownLink` (CODING_GUIDELINES §9); the host resolves `path → uri` via `LinkIndexService.uriFor` and routes to `provider.openInMarkStudio(uri, 0)` — the PR #4 pending-reveal handshake. **The graph never calls `vscode.window.showTextDocument` directly**; it would open the built-in text editor for a not-yet-open note.
+6. **Simulation on the webview main thread (no worker for v1).** The panel is a *separate webview* from the editor, so simulation work cannot starve the editor or the host. The simulation **halts on convergence** (kinetic energy < ε pauses the RAF loop); it never burns CPU at idle. A web worker is a deferred follow-up gated on profiling.
+7. **Live updates merge by `path`.** On a fresh `graphData` the webview keeps a `Map<path, SimulationNode>` and reuses existing positions for unchanged paths; new nodes spawn at the centre; removed nodes are dropped. The simulation re-warms briefly so the layout re-settles smoothly. No full re-initialisation on every save.
+8. **Wiki-link only for v1.** Markdown-link edges (T-4.1a) and heading-level edges (T-4.1c) are tracked follow-ups; pulling them forward would conflate this sprint with backlog work.
+
+### Alternatives Considered
+1. **Adopt `d3-force` (~30 KB min) for the simulation.** Rejected for v1: the bundle delta is modest but the standing project rule is "zero new dependencies unless the in-tree alternative is genuinely worse" (ADR-0005). At ≤ 500 nodes a hand-rolled Fruchterman–Reingold is adequate. If Phase D profiling shows a real bottleneck, the in-tree fallback is **adding a Barnes–Hut quadtree in-tree** before reaching for the dependency.
+2. **Adopt `cytoscape.js` (~300 KB min) or `vis-network` (~150 KB min).** Rejected: massive bundle delta for v1; both ship their own theming conventions, which fight `--vscode-*` tokens (project philosophy). Either would also push us toward a custom design system, which the project explicitly forbids.
+3. **Render the body in SVG (not Canvas2D).** Rejected for nodes + edges: at 500 nodes every drag would mutate hundreds of DOM elements per frame. Canvas one-draw-per-frame is the right primitive for the body. **Kept** for labels: Canvas text is fuzzy at sub-pixel positions and ignores VS Code's font configuration.
+4. **Render inside the editor's preview pane.** Rejected: the preview is per-document and incrementally patched on every edit (ADR-0008); the graph is workspace-wide and unrelated to any one document. A dedicated panel is the honest surface.
+5. **Use a custom editor view type with a virtual document backing it.** Rejected: there is no per-document state to back the editor. `vscode.window.createWebviewPanel` is the right primitive (ADR-0002 still applies — single persistent panel, retained when hidden).
+6. **Run the simulation in a web worker.** Deferred: profile first (Phase D). The graph panel is a separate webview; main-thread simulation cannot block the editor. A worker is a future optimisation if a vault grows beyond ~500 notes.
+7. **Persist node positions across sessions** (via `Memento`). Deferred: `retainContextWhenHidden` already covers in-session persistence; cross-session is a follow-up.
+8. **A separate `markstudio.graph.enabled` setting.** Deferred: the command alone is the surface; nothing runs unless the user opens the panel, so the cost is zero by default.
+
+### Reasoning
+The shared link index (ADR-0020) and the `provider.openInMarkStudio` handshake (PR #4) already do the heavy lifting; a vault-wide visualisation is mostly a small new read seam plus a new webview surface. Adding a graph library would be the easy answer, but the bundle cost is real and the theming conflict is worse — a fourth-party library would either look out of place against `--vscode-*` tokens or require fighting it to look native, neither of which is justifiable at the scale the project targets. The hand-rolled simulation is small (≈ 200 LoC), pure, deterministic given a seed, and converges + halts so it does not burn CPU at idle. Canvas2D + DOM labels is the boring + correct split: cheap drawing for the body, theme-correct text from VS Code for the labels. Routing every click through `provider.openInMarkStudio` is non-negotiable: it is the only path that opens MarkStudio (not the built-in text editor) for a not-yet-open note, and reusing it means the graph cannot drift from wiki-link / backlinks / standard-markdown-link navigation.
+
+### Consequences
+**Positive:** A first-party-feeling graph panel that shares the existing index, navigation, and theming. No new runtime dependencies. The editor's webview bundle is **untouched** (the graph is a separate lazy bundle). One `LinkIndexService` shared with Backlinks + click-nav + hover; one `provider.openInMarkStudio` shared with every navigation path. The pure model (`graphModel.ts`) and pure simulation (`forceSimulation.ts`) are unit-testable without booting VS Code.
+**Negative / Trade-offs:** No filters / clustering / find-in-graph / minimap / multi-select / animated transitions / persisted positions / Markdown-link or heading-level edges in v1 — all deferred and tracked. The hand-rolled simulation is O(n²) per tick; if a vault exceeds ~500 notes the frame budget may tighten (ADR records the bar for adding a Barnes–Hut quadtree in-tree or escalating to `d3-force`). The simulation runs on the webview main thread (panel-local; cannot block the editor, but can block its own panel during very large warms — a worker is a deferred follow-up).
+**Neutral:** New `GraphDataMessage` + `OpenGraphNodeMessage` in the protocol; new `src/graph/` module mirroring `src/links/` / `src/outline/`; new `src/webview/graph/` entry with its own esbuild target; new `markstudio.graph.show` command. No new dependency, no new setting.
+
+### Compliance Impact
+No rule bent. Upholds ADR-0001 (the host reads notes and resolves URIs; the webview only draws), ADR-0002 (single persistent webview panel, `retainContextWhenHidden`, no recreation), ADR-0004 (reuses the M4.1 index/watcher and the VS Code theme tokens), ADR-0005 (vanilla TS + zero new runtime deps), ADR-0006 (esbuild adds a third bundle, mirrors ADR-0016's Mermaid pattern), ADR-0008 (the editor's preview renderer is untouched — the graph is a separate surface), ADR-0020 (one shared link index), and the PR #4 amendments to ADR-0021 (every click routes through `provider.openInMarkStudio`).
+
+### Migration Plan
+Not a migration. `extension.ts` constructs a `GraphService` alongside `registerBacklinks` and pushes it to `context.subscriptions`. `package.json` contributes `markstudio.graph.show`. `esbuild.js` adds a third target. No existing behaviour changes; no migration of stored state.
+
+### Follow-Ups
+* Filters (folder / tag / search string).
+* Local subgraph mode (N-hop neighbourhood of the current note).
+* Persisted node positions across sessions (`Memento`).
+* Markdown-link edges (T-4.1a) and heading-level edges (T-4.1c) once their parent backlog items land.
+* Animated transitions on graph changes (fade-in, eased reposition).
+* Find-in-graph / minimap / multi-select / clustering.
+* Web-worker simulation if a vault grows beyond ~500 notes.
+* Barnes–Hut quadtree in-tree if the O(n²) integrator becomes the bottleneck (preferred over a `d3-force` dependency).
+* Keyboard navigation through nodes (accessibility).
+* CodeMirror-pane integration ("jump from a wiki-link in source to its node in the graph").
+
+### References
+* [ADR-0001](#adr-0001-use-the-custom-editor-api)
+* [ADR-0002](#adr-0002-one-persistent-webview-retained-when-hidden)
+* [ADR-0005](#adr-0005-vanilla-typescripthtmlcss--no-frameworks)
+* [ADR-0006](#adr-0006-bundle-with-esbuild)
+* [ADR-0008](#adr-0008-markdown-it-package-and-incremental-block-level-preview-patching)
+* [ADR-0016](#adr-0016-lazy-loaded-mermaid-for-diagram-rendering-in-the-preview)
+* [ADR-0020](#adr-0020-host-side-link-index-with-a-case-insensitive-basename-resolver-behind-a-filesystemwatcher)
+* [ADR-0021](#adr-0021-in-preview-wiki-link-navigation-via-a-shared-host-side-resolver-and-an-openwikilink-message)
+* [design/graph-view.md](design/graph-view.md)
+* [api/message-protocol.md](api/message-protocol.md) — `graphData` / `openGraphNode` (added in Phase E)
+* [ROADMAP.md](ROADMAP.md) — Phase 4
+* [TODO.md](TODO.md) — M4.4

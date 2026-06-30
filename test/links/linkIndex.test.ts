@@ -253,3 +253,84 @@ describe("buildLinkIndex — resolveForward (T-4.1b navigation)", () => {
     assert.deepEqual(index.resolveForward("A.md", "   "), []);
   });
 });
+
+describe("buildLinkIndex — allEdges (M4.4 graph)", () => {
+  it("returns one edge per resolved (from, to) pair", () => {
+    const index = buildLinkIndex([
+      note("A.md", [{ target: "B" }]),
+      note("B.md", [{ target: "C" }]),
+      note("C.md", [])
+    ]);
+    assert.deepEqual(
+      [...index.allEdges()].sort(
+        (a, b) => a.from.localeCompare(b.from) || a.to.localeCompare(b.to)
+      ),
+      [
+        { from: "A.md", to: "B.md", weight: 1 },
+        { from: "B.md", to: "C.md", weight: 1 }
+      ]
+    );
+  });
+
+  it("collapses multi-links between the same pair into one edge with weight", () => {
+    const index = buildLinkIndex([
+      note("A.md", [
+        { target: "B", line: 0 },
+        { target: "B", line: 4 },
+        { target: "B", line: 9 }
+      ]),
+      note("B.md", [])
+    ]);
+    const edges = index.allEdges();
+    assert.equal(edges.length, 1);
+    assert.equal(edges[0].from, "A.md");
+    assert.equal(edges[0].to, "B.md");
+    assert.equal(edges[0].weight, 3);
+  });
+
+  it("preserves direction (A→B and B→A are distinct edges)", () => {
+    const index = buildLinkIndex([
+      note("A.md", [{ target: "B" }]),
+      note("B.md", [{ target: "A" }])
+    ]);
+    const edges = [...index.allEdges()].sort(
+      (a, b) => a.from.localeCompare(b.from) || a.to.localeCompare(b.to)
+    );
+    assert.equal(edges.length, 2);
+    assert.deepEqual(edges, [
+      { from: "A.md", to: "B.md", weight: 1 },
+      { from: "B.md", to: "A.md", weight: 1 }
+    ]);
+  });
+
+  it("excludes self-edges (a [[A]] inside A.md)", () => {
+    const index = buildLinkIndex([note("A.md", [{ target: "A" }])]);
+    assert.deepEqual(index.allEdges(), []);
+  });
+
+  it("returns no edges for a workspace with no links", () => {
+    const index = buildLinkIndex([note("A.md", []), note("B.md", [])]);
+    assert.deepEqual(index.allEdges(), []);
+  });
+
+  it("includes both edges from an ambiguous basename target", () => {
+    const index = buildLinkIndex([
+      note("A.md", [{ target: "Guide" }]),
+      note("docs/Guide.md", []),
+      note("archive/Guide.md", [])
+    ]);
+    const edges = [...index.allEdges()].sort(
+      (a, b) => a.from.localeCompare(b.from) || a.to.localeCompare(b.to)
+    );
+    assert.equal(edges.length, 2);
+    assert.deepEqual(edges.map((edge) => edge.to).sort(), [
+      "archive/Guide.md",
+      "docs/Guide.md"
+    ]);
+  });
+
+  it("ignores unresolved targets (no phantom edges)", () => {
+    const index = buildLinkIndex([note("A.md", [{ target: "Ghost" }])]);
+    assert.deepEqual(index.allEdges(), []);
+  });
+});

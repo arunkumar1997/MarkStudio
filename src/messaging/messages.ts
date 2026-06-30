@@ -159,6 +159,40 @@ export interface LinkPreviewContentMessage {
   readonly title?: string;
 }
 
+// A node in a `graphData` payload (M4.4). Plain JSON; mirrors `GraphNode` from
+// `src/graph/graphModel.ts` (the host builds it there, the webview renders it).
+// `path` is the stable workspace-relative POSIX identity, `label` the display
+// name (basename minus extension), `isCurrent` whether this is the active
+// MarkStudio editor's note.
+export interface GraphDataNode {
+  readonly path: string;
+  readonly label: string;
+  readonly isCurrent: boolean;
+}
+
+// A directed edge in a `graphData` payload (M4.4). `from` / `to` reference
+// node paths in the same payload; `weight` is ≥ 1 (multi-links collapsed).
+export interface GraphDataEdge {
+  readonly from: string;
+  readonly to: string;
+  readonly weight: number;
+}
+
+// Host pushes the full workspace graph to the webview (M4.4). Sent on the
+// initial panel `ready`, on every `LinkIndexService.onDidChangeIndex` (after a
+// short debounce), and whenever the active MarkStudio editor changes (so the
+// current-node marker updates). The webview merges by `path`: nodes whose
+// `path` is unchanged keep their simulation position, new nodes spawn at the
+// centre, and dropped nodes are removed; the simulation re-warms briefly so
+// the layout re-settles smoothly. `currentPath` is `null` when no MarkStudio
+// editor is active.
+export interface GraphDataMessage {
+  readonly type: "graphData";
+  readonly nodes: ReadonlyArray<GraphDataNode>;
+  readonly edges: ReadonlyArray<GraphDataEdge>;
+  readonly currentPath: string | null;
+}
+
 // Either direction. Carries a human-readable diagnostic.
 export interface ErrorMessage {
   readonly type: "error";
@@ -175,6 +209,7 @@ export type HostToWebviewMessage =
   | ConfigChangedMessage
   | RevealLineMessage
   | LinkPreviewContentMessage
+  | GraphDataMessage
   | ErrorMessage;
 
 // ─── Webview → Host ─────────────────────────────────────────────────────────
@@ -263,6 +298,19 @@ export interface OpenMarkdownLinkMessage {
   readonly heading: string | null;
 }
 
+// The webview asks the host to open a workspace note by its graph-node `path`
+// (M4.4). Posted when the user clicks a node in the graph view. `path` is the
+// stable workspace-relative POSIX identity the host shipped in `graphData`;
+// the host resolves it back to a `vscode.Uri` via `LinkIndexService.uriFor`
+// and routes through `provider.openInMarkStudio(uri, 0)` (the PR #4 pending-
+// reveal handshake — so a not-yet-open note still opens in MarkStudio, not
+// the built-in text editor). `path` is an untrusted string validated at the
+// bus boundary before the host acts.
+export interface OpenGraphNodeMessage {
+  readonly type: "openGraphNode";
+  readonly path: string;
+}
+
 export type WebviewToHostMessage =
   | ReadyMessage
   | EditMessage
@@ -270,6 +318,7 @@ export type WebviewToHostMessage =
   | OpenWikiLinkMessage
   | RequestLinkPreviewMessage
   | OpenMarkdownLinkMessage
+  | OpenGraphNodeMessage
   | ErrorMessage;
 
 // ─── Boundary guards ────────────────────────────────────────────────────────
@@ -304,6 +353,25 @@ function isMarkStudioConfig(value: unknown): value is MarkStudioConfig {
     typeof value.taskLists === "boolean" &&
     typeof value.tables === "boolean" &&
     typeof value.strikethrough === "boolean"
+  );
+}
+
+function isGraphDataNode(value: unknown): value is GraphDataNode {
+  return (
+    isObject(value) &&
+    typeof value.path === "string" &&
+    typeof value.label === "string" &&
+    typeof value.isCurrent === "boolean"
+  );
+}
+
+function isGraphDataEdge(value: unknown): value is GraphDataEdge {
+  return (
+    isObject(value) &&
+    typeof value.from === "string" &&
+    typeof value.to === "string" &&
+    typeof value.weight === "number" &&
+    Number.isFinite(value.weight)
   );
 }
 
@@ -357,6 +425,14 @@ export function isHostToWebviewMessage(
         (value.text === undefined || typeof value.text === "string") &&
         (value.title === undefined || typeof value.title === "string")
       );
+    case "graphData":
+      return (
+        Array.isArray(value.nodes) &&
+        value.nodes.every(isGraphDataNode) &&
+        Array.isArray(value.edges) &&
+        value.edges.every(isGraphDataEdge) &&
+        (value.currentPath === null || typeof value.currentPath === "string")
+      );
     case "error":
       return typeof value.message === "string";
     default:
@@ -396,6 +472,8 @@ export function isWebviewToHostMessage(
         typeof value.target === "string" &&
         (value.heading === null || typeof value.heading === "string")
       );
+    case "openGraphNode":
+      return typeof value.path === "string" && value.path.length > 0;
     case "error":
       return typeof value.message === "string";
     default:

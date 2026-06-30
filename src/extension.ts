@@ -4,6 +4,7 @@ import { registerCommands } from "./commands/registerCommands";
 import { registerOutline } from "./outline/registerOutline";
 import { registerBacklinks } from "./links/registerBacklinks";
 import { LinkIndexService } from "./links/LinkIndexService";
+import { GraphService } from "./graph/GraphService";
 import { StateStore } from "./services/StateStore";
 import { ConfigurationService } from "./services/ConfigurationService";
 import { WordCountStatusBar } from "./status/WordCountStatusBar";
@@ -15,6 +16,7 @@ import { WordCountStatusBar } from "./status/WordCountStatusBar";
 // extension API.
 export interface MarkStudioExtensionApi {
   readonly provider: MarkStudioEditorProvider;
+  readonly graphService: GraphService;
 }
 
 // Activation entry point. Registers the MarkStudio custom editor and the
@@ -47,19 +49,28 @@ export function activate(
   // block on the workspace scan (ROADMAP Phase 4 exit criterion).
   linkIndexService.start();
 
+  // M4.4 Graph View — free-standing webview panel, lazy `dist/graph.js` bundle
+  // (ADR-0023). Surfaced only via the `markstudio.graph.show` command; the
+  // panel is created on first invocation and reused thereafter
+  // (`retainContextWhenHidden`).
+  const { service: graphService, disposable: graphCommand } =
+    GraphService.register(context, provider, linkIndexService);
+
   context.subscriptions.push(
     disposable,
     registerCommands(provider),
     registerOutline(provider),
     registerBacklinks(provider, linkIndexService),
     linkIndexService,
+    graphService,
+    graphCommand,
     wordCountStatusBar,
     provider.onDidChangeActiveDocument((document) => {
       wordCountStatusBar.setActiveDocument(document);
     })
   );
 
-  return { provider };
+  return { provider, graphService };
 }
 
 export function deactivate(): void {

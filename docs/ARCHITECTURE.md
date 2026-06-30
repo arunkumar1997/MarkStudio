@@ -147,6 +147,8 @@ Files are intentionally small and single-purpose. If a file grows past a single 
 | `linkExcerpt` | **Pure** capped excerpt extraction for the hover card: top-of-note or `#heading`-section slice (reuses `parseHeadings` / `findHeadingLine`), capped to ≤ 60 lines / ≤ 2,000 chars (M4.2, ADR-0022) | Import `vscode`/DOM; touch the file system |
 | `LinkIndexService` | Async, batched workspace scan + `FileSystemWatcher` + debounced incremental rebuild; fire `onDidChangeIndex`; resolve a clicked **or hovered** target to URIs via `resolveTarget` (T-4.1, T-4.1b, M4.2, ADR-0020/0021/0022). **One instance**, owned by `extension.ts`, injected into both the backlinks registration and the editor provider | Block activation; re-scan everything on each change; be instantiated more than once |
 | `BacklinksTreeProvider` / `registerBacklinks` | Back a native tree view with the notes that link to the active note; open the source at the linking line on click (T-4.1) | Render the panel inside the webview; index synchronously on the activation path |
+| `graphModel` | **Pure** graph builder: turn `LinkIndex` note paths + edges into deterministic `{ nodes, edges, currentPath }` for the graph webview (ASCII-codepoint sort, self-edge + unknown-endpoint drops; M4.4, ADR-0023) | Import `vscode`/DOM; do layout or rendering |
+| `GraphService` | Own the single graph `WebviewPanel` (`retainContextWhenHidden`); on open / `onDidChangeIndex` (debounced) / `onDidChangeActiveDocument`, post a typed `graphData` message built from the shared `LinkIndexService`; handle `openGraphNode` by routing through `provider.openInMarkStudio` — the same PR #4 pending-reveal handshake as click-navigation (M4.4, ADR-0023) | Reload the panel; embed CodeMirror or the preview renderer; open targets through `showTextDocument` |
 
 ### 4.2 Webview
 
@@ -159,6 +161,7 @@ Files are intentionally small and single-purpose. If a file grows past a single 
 | `scrollSync` | Keep editor and preview scroll positions aligned | Trigger layout thrash |
 | `themeBridge` | Consume `--vscode-*` variables for all styling | Read computed colors or hardcode values |
 | `viewState` | Persist cursor, scroll, split ratio, preview visibility via `setState` | Persist document content (the host owns that) |
+| `graph/forceSimulation` + `graph/render` + `graph/main` (lazy bundle `dist/graph.js`) | Hand-rolled Fruchterman–Reingold simulation + Canvas2D body + DOM labels + RAF loop; merge-by-path on `graphData`; drag/pan/wheel-zoom/hover/click; live `--vscode-*` token sampling per frame so the graph reacts to theme changes without host wiring (M4.4, ADR-0023) | Pull in any new runtime dependency (d3-force, cytoscape.js, vis-network — all rejected); reload the preview bundle on the graph path |
 
 ---
 

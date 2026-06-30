@@ -78,6 +78,12 @@
         "command": "markstudio.focusPreview",
         "title": "Focus Preview",
         "category": "MarkStudio"
+      },
+      {
+        "command": "markstudio.graph.show",
+        "title": "Show Graph",
+        "category": "MarkStudio",
+        "icon": "$(type-hierarchy)"
       }
     ],
     "keybindings": [
@@ -106,6 +112,15 @@
         "when": "activeCustomEditorId == 'markstudio.editor'"
       }
     ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "markstudio.graph.show",
+          "group": "navigation@99",
+          "when": "activeCustomEditorId == 'markstudio.editor'"
+        }
+      ]
+    },
     "configuration": {
       "title": "MarkStudio",
       "properties": {
