@@ -10,6 +10,7 @@ import { runAll } from "./harness";
 import "./suite/lifecycle.test";
 import "./suite/navigation.test";
 import "./suite/graphView.test";
+import "./suite/templates.test";
 
 export function run(): Promise<void> {
   return runAll();

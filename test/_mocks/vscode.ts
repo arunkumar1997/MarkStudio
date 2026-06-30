@@ -54,6 +54,33 @@ let lastAppliedEdit: WorkspaceEdit | null = null;
 let configValues: Record<string, unknown> = {};
 let changeListeners: Array<(event: ConfigChangeEvent) => void> = [];
 
+// In-memory filesystem backing `workspace.fs` (Sprint 7 — TemplateService).
+interface FsEntry {
+  readonly type: FileType;
+  content?: Uint8Array;
+}
+let fsEntries = new Map<string, FsEntry>();
+let mockWorkspaceFolders: WorkspaceFolder[] | undefined;
+let mockWorkspaceName: string | undefined;
+let mockClipboardText = "";
+let statusBarMessages: string[] = [];
+let errorMessages: string[] = [];
+let createdWatchers: MockFileSystemWatcher[] = [];
+
+function normalizePath(path: string): string {
+  const trimmed = path.replace(/\/+$/, "");
+  return trimmed.length > 0 ? trimmed : "/";
+}
+
+function ensureDir(path: string): void {
+  let current = normalizePath(path);
+  while (current !== "/" && !fsEntries.has(current)) {
+    fsEntries.set(current, { type: FileType.Directory });
+    const slash = current.lastIndexOf("/");
+    current = slash <= 0 ? "/" : current.slice(0, slash);
+  }
+}
+
 interface ConfigChangeEvent {
   affectsConfiguration(section: string): boolean;
 }
@@ -92,6 +119,74 @@ export function __reset(): void {
   lastAppliedEdit = null;
   configValues = {};
   changeListeners = [];
+  fsEntries = new Map();
+  mockWorkspaceFolders = undefined;
+  mockWorkspaceName = undefined;
+  mockClipboardText = "";
+  statusBarMessages = [];
+  errorMessages = [];
+  createdWatchers = [];
+}
+
+// ─── Filesystem + workspace control surface (Sprint 7) ──────────────────────
+
+// Seed a file (and its ancestor directories) into the in-memory filesystem.
+export function __setFile(path: string, content: string): void {
+  const normalized = normalizePath(path);
+  const slash = normalized.lastIndexOf("/");
+  if (slash > 0) {
+    ensureDir(normalized.slice(0, slash));
+  }
+  fsEntries.set(normalized, {
+    type: FileType.File,
+    content: Buffer.from(content, "utf8")
+  });
+}
+
+// Read a file's UTF-8 content back, or `undefined` if it does not exist.
+export function __readFile(path: string): string | undefined {
+  const entry = fsEntries.get(normalizePath(path));
+  return entry?.content !== undefined
+    ? Buffer.from(entry.content).toString("utf8")
+    : undefined;
+}
+
+// Set the workspace folders `workspace.workspaceFolders` returns.
+export function __setWorkspaceFolders(paths: ReadonlyArray<string>): void {
+  mockWorkspaceFolders = paths.map((p, index) => ({
+    uri: new Uri(normalizePath(p)),
+    name: p.slice(p.lastIndexOf("/") + 1),
+    index
+  }));
+}
+
+export function __setWorkspaceName(name: string | undefined): void {
+  mockWorkspaceName = name;
+}
+
+export function __setClipboard(text: string): void {
+  mockClipboardText = text;
+}
+
+export function __getStatusBarMessages(): string[] {
+  return [...statusBarMessages];
+}
+
+export function __getErrorMessages(): string[] {
+  return [...errorMessages];
+}
+
+// Fire a watcher event so subscribers (e.g. TemplateService) react. The mock
+// fires on every created watcher, mirroring how the real host would deliver a
+// matching event to a watcher whose glob covers the URI.
+export function __fireWatcher(
+  kind: "create" | "change" | "delete",
+  path: string
+): void {
+  const uri = new Uri(normalizePath(path));
+  for (const watcher of createdWatchers) {
+    watcher.__fire(kind, uri);
+  }
 }
 
 // ─── The `vscode.workspace` subset under test ───────────────────────────────
@@ -130,8 +225,135 @@ export const workspace = {
   asRelativePath(uriOrPath: Uri | string): string {
     const raw = typeof uriOrPath === "string" ? uriOrPath : uriOrPath.path;
     return raw.replace(/^\/vault\//, "");
+  },
+
+  get workspaceFolders(): WorkspaceFolder[] | undefined {
+    return mockWorkspaceFolders;
+  },
+
+  get name(): string | undefined {
+    return mockWorkspaceName;
+  },
+
+  createFileSystemWatcher(_pattern: unknown): MockFileSystemWatcher {
+    const watcher = new MockFileSystemWatcher();
+    createdWatchers.push(watcher);
+    return watcher;
+  },
+
+  fs: {
+    readFile(uri: Uri): Promise<Uint8Array> {
+      const entry = fsEntries.get(normalizePath(uri.path));
+      if (entry === undefined || entry.type !== FileType.File) {
+        return Promise.reject(new Error(`ENOENT: ${uri.path}`));
+      }
+      return Promise.resolve(entry.content ?? new Uint8Array());
+    },
+    writeFile(uri: Uri, content: Uint8Array): Promise<void> {
+      const normalized = normalizePath(uri.path);
+      const slash = normalized.lastIndexOf("/");
+      if (slash > 0) {
+        ensureDir(normalized.slice(0, slash));
+      }
+      fsEntries.set(normalized, { type: FileType.File, content });
+      return Promise.resolve();
+    },
+    stat(uri: Uri): Promise<{ type: FileType }> {
+      const entry = fsEntries.get(normalizePath(uri.path));
+      if (entry === undefined) {
+        return Promise.reject(new Error(`ENOENT: ${uri.path}`));
+      }
+      return Promise.resolve({ type: entry.type });
+    },
+    readDirectory(uri: Uri): Promise<[string, FileType][]> {
+      const dir = normalizePath(uri.path);
+      if (dir !== "/" && fsEntries.get(dir)?.type !== FileType.Directory) {
+        return Promise.reject(new Error(`ENOENT: ${uri.path}`));
+      }
+      const prefix = dir === "/" ? "/" : `${dir}/`;
+      const children: [string, FileType][] = [];
+      for (const [path, entry] of fsEntries) {
+        if (path === dir || !path.startsWith(prefix)) {
+          continue;
+        }
+        const rest = path.slice(prefix.length);
+        if (rest.includes("/")) {
+          continue; // not an immediate child
+        }
+        children.push([rest, entry.type]);
+      }
+      return Promise.resolve(children);
+    }
   }
 };
+
+// ─── Environment + window surface (Sprint 7) ────────────────────────────────
+
+export const env = {
+  clipboard: {
+    readText(): Promise<string> {
+      return Promise.resolve(mockClipboardText);
+    }
+  }
+};
+
+export const window = {
+  setStatusBarMessage(message: string, _hideAfterMs?: number): Disposable {
+    statusBarMessages.push(message);
+    return new Disposable(() => {});
+  },
+  showErrorMessage(message: string): Promise<undefined> {
+    errorMessages.push(message);
+    return Promise.resolve(undefined);
+  }
+};
+
+// ─── Filesystem + glob value types (Sprint 7) ───────────────────────────────
+
+export enum FileType {
+  Unknown = 0,
+  File = 1,
+  Directory = 2,
+  SymbolicLink = 64
+}
+
+export class RelativePattern {
+  public constructor(
+    public readonly base: unknown,
+    public readonly pattern: string
+  ) {}
+}
+
+export interface WorkspaceFolder {
+  readonly uri: Uri;
+  readonly name: string;
+  readonly index: number;
+}
+
+class MockFileSystemWatcher {
+  private readonly createEmitter = new EventEmitter<Uri>();
+  private readonly changeEmitter = new EventEmitter<Uri>();
+  private readonly deleteEmitter = new EventEmitter<Uri>();
+  public readonly onDidCreate = this.createEmitter.event;
+  public readonly onDidChange = this.changeEmitter.event;
+  public readonly onDidDelete = this.deleteEmitter.event;
+
+  public __fire(kind: "create" | "change" | "delete", uri: Uri): void {
+    if (kind === "create") {
+      this.createEmitter.fire(uri);
+    } else if (kind === "change") {
+      this.changeEmitter.fire(uri);
+    } else {
+      this.deleteEmitter.fire(uri);
+    }
+  }
+
+  public dispose(): void {
+    this.createEmitter.dispose();
+    this.changeEmitter.dispose();
+    this.deleteEmitter.dispose();
+  }
+}
 
 // ─── Tree / theme surface (Phase D of Sprint 6 — for BacklinksTreeProvider) ─
 
@@ -143,6 +365,14 @@ export class Uri {
   public constructor(public readonly path: string) {}
   public static file(fsPath: string): Uri {
     return new Uri(fsPath);
+  }
+  public static parse(value: string): Uri {
+    return new Uri(value.replace(/^file:\/\//, ""));
+  }
+  public static joinPath(base: Uri, ...segments: string[]): Uri {
+    const trimmed = base.path.replace(/\/+$/, "");
+    const tail = segments.filter((s) => s.length > 0).join("/");
+    return new Uri(tail.length > 0 ? `${trimmed}/${tail}` : trimmed);
   }
   public toString(): string {
     return `file://${this.path}`;
