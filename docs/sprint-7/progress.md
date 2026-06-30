@@ -7,7 +7,7 @@
 
 ---
 
-## Status: 🟢 Phase A (design) — COMPLETE · 🟢 Phase B (pure modules) — COMPLETE · 🟢 Phase C (service + commands) — COMPLETE · 🟢 Phase D (integration + exthost tests) — COMPLETE · 🟡 Phase E (docs + gate + push) — NEXT
+## Status: 🟢 Phase A (design) — COMPLETE · 🟢 Phase B (pure modules) — COMPLETE · 🟢 Phase C (service + commands) — COMPLETE · 🟢 Phase D (integration + exthost tests) — COMPLETE · � Phase E (docs + gate + push) — COMPLETE
 
 | # | Phase / Task | State | Owner | Notes |
 |---|---|---|---|---|
@@ -23,8 +23,8 @@
 | 9 | Unit tests — parser / expander / formatter / resolver | 🟢 Done (Phase B) | Ivy | +58 (20 parser + 9 formatter + 20 expander + 12 resolver); unit 316 → 374 |
 | 10 | Integration tests — `TemplateService` watcher round-trip, conflict policy, openExample idempotency | ✅ Done | Ivy | +6 in `test/integration/templateService.test.ts` (scan, watcher rebuild, two-root precedence, expand+create, no-overwrite, openExample idempotent); integration 65 → 71 |
 | 11 | Exthost tests — command registration, `dailyNotes.openToday` create-then-open round-trip, opens in MarkStudio | ✅ Done | Ivy | +3 in `test/exthost/suite/templates.test.ts` (3 commands contributed; openExample writes+opens TabInputCustom; openToday create-then-open idempotent); exthost 13 → 16 |
-| 12 | Docs pass — ADR-0025, design doc, status/handoff/roadmap/todo/features/changelog/architecture | ⬜ Not started | Sage + Remy | Phase E |
-| 13 | Manual F5 matrix (see plan.md §5.13) | ⬜ Not started | Ivy + human | Theme matrix (dark/light/HC) on QuickPick; opens-in-MarkStudio verified |
+| 12 | Docs pass — ADR-0025, design doc, status/handoff/roadmap/todo/features/changelog/architecture | ✅ Done | Sage + Remy | Phase E — CHANGELOG, ROADMAP, FEATURES, TODO, ARCHITECTURE, PROJECT_STATUS, AGENT_HANDOFF (overwritten), qa/sprint-7-signoff.md (new) |
+| 13 | Manual F5 matrix (see plan.md §5.13) | ⬜ Human-only | Ivy + human | Producer-owned F5 sweep — theme matrix (dark/light/HC) on QuickPick; opens-in-MarkStudio verified. NOT fabricated by the dev team. |
 
 ## Verification (local)
 
@@ -43,6 +43,7 @@ _(none yet — first commit will be the plan; ADR-0025 + `design/templates.md` f
 * _(Phase B)_ feat(templates): pure modules — front-matter parser, variable expander, date formatter, two-root resolver + unit tests
 * _(Phase C)_ feat(templates): TemplateService + registerTemplates + extension wiring + package.json commands/settings
 * _(Phase D)_ test(templates): +6 integration (TemplateService scan/watch/create) + widen vscode mock (in-memory fs, watcher, env.clipboard); +3 exthost (commands contributed, openExample + openToday open in MarkStudio)
+* _(Phase E)_ docs(sprint-7): CHANGELOG + ROADMAP + FEATURES + TODO + ARCHITECTURE + PROJECT_STATUS + AGENT_HANDOFF (overwritten) + qa/sprint-7-signoff.md; progress tracker closed
 
 ## Bundle sizes (running)
 

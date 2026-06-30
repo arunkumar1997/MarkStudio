@@ -101,6 +101,14 @@ src/
 │   └── registerBacklinks.ts          # wires the TreeView, follows the active doc, open command
 │                                      #   (LinkIndexService injected from extension.ts; resolveTarget for click-nav, T-4.1b)
 │
+├── templates/                    # Templates engine (M5.1 + M5.3, ADR-0025) — pure core + one I/O service
+│   ├── frontMatterParser.ts          # pure in-tree `---` front-matter reader (fixed schema; no `vscode`/deps)
+│   ├── dateFormatter.ts              # pure YYYY/MM/DD/HH/mm formatter over Intl.DateTimeFormat parts
+│   ├── variableExpander.ts           # pure variable allowlist + {{cursor}} marker + slugify (snippet ${N} passes through)
+│   └── TemplateService.ts            # two-root async scan + 2 FileSystemWatchers + debounce + onDidChangeTemplates;
+│                                      #   two-pass create, never overwrite, opens via provider.openInMarkStudio
+│   #   templateResolver.ts           # pure workspace+user merge by basename (workspace wins, first-root-wins)
+│
 └── webview/                      # Webview (browser) runtime — bundled separately
     ├── main.ts                       # builds the App Shell exactly once; mounts the editor
     ├── app/
@@ -150,6 +158,9 @@ Files are intentionally small and single-purpose. If a file grows past a single 
 | `BacklinksTreeProvider` / `registerBacklinks` | Back a native tree view with the notes that link to the active note; per-kind icon (`$(symbol-reference)` for wiki, `$(link)` for Markdown — T-4.1a) and per-record description / tooltip suffix `→ <heading> (line N)` when a heading anchor resolves (T-4.1c); open the source at the linking line on click (T-4.1) | Render the panel inside the webview; index synchronously on the activation path |
 | `graphModel` | **Pure** graph builder: turn `LinkIndex` note paths + edges into deterministic `{ nodes, edges, currentPath }` for the graph webview (ASCII-codepoint sort, self-edge + unknown-endpoint drops; M4.4, ADR-0023) | Import `vscode`/DOM; do layout or rendering |
 | `GraphService` | Own the single graph `WebviewPanel` (`retainContextWhenHidden`); on open / `onDidChangeIndex` (debounced) / `onDidChangeActiveDocument`, post a typed `graphData` message built from the shared `LinkIndexService`; handle `openGraphNode` by routing through `provider.openInMarkStudio` — the same PR #4 pending-reveal handshake as click-navigation (M4.4, ADR-0023) | Reload the panel; embed CodeMirror or the preview renderer; open targets through `showTextDocument` |
+| `frontMatterParser` / `dateFormatter` / `variableExpander` / `templateResolver` | **Pure** template core (M5.1, ADR-0025): in-tree fixed-schema `---` reader; `YYYY/MM/DD/HH/mm` formatter over `Intl.DateTimeFormat` parts; closed variable allowlist + `{{cursor}}` marker + `slugify` (snippet `${N}` and unknown tokens pass through verbatim for M5.2); workspace+user merge by basename (workspace wins, first-root-wins, stable sort) | Import `vscode`/DOM; touch the file system; add a new runtime dependency (`gray-matter`/`dayjs`/Handlebars all rejected); expand a token outside the allowlist |
+| `TemplateService` | Async scan of both template roots + two `FileSystemWatcher`s + 250 ms debounced rebuild; fire `onDidChangeTemplates`; **two-pass** create (provisional filename resolves `output:`, then body expands against the final filename); **never overwrite** (collision opens the existing file with a status notice); every open routes through `provider.openInMarkStudio` (M5.1/M5.3, ADR-0025). Exposed on `MarkStudioExtensionApi` | Block activation; overwrite an existing note; open via `showTextDocument`; change the webview/message protocol |
+| `registerTemplates` | Own the three commands (`markstudio.templates.create` / `.openExample` / `markstudio.dailyNotes.openToday`) and the native QuickPick → `InputBox` flow; delegate all logic to `TemplateService` (M5.1/M5.3, ADR-0025) | Hold business logic; build a custom webview picker; show a non-native UI |
 
 ### 4.2 Webview
 
