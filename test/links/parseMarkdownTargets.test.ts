@@ -84,13 +84,10 @@ describe("parseMarkdownTargets — basic syntax", () => {
   });
 
   it("returns multiple links on the same line in document order", () => {
-    assert.deepEqual(
-      parseMarkdownTargets("see [a](./A.md) and [b](./B.md)"),
-      [
-        { target: "./A.md", heading: null, line: 0 },
-        { target: "./B.md", heading: null, line: 0 }
-      ]
-    );
+    assert.deepEqual(parseMarkdownTargets("see [a](./A.md) and [b](./B.md)"), [
+      { target: "./A.md", heading: null, line: 0 },
+      { target: "./B.md", heading: null, line: 0 }
+    ]);
   });
 
   it("records the correct 0-based line index for multi-line documents", () => {
@@ -141,10 +138,7 @@ describe("parseMarkdownTargets — rejected destinations", () => {
   });
 
   it("skips a reference-style link `[text][id]`", () => {
-    assert.deepEqual(
-      parseMarkdownTargets("[guide][g]\n\n[g]: ./Guide.md"),
-      []
-    );
+    assert.deepEqual(parseMarkdownTargets("[guide][g]\n\n[g]: ./Guide.md"), []);
   });
 
   it("skips an empty destination `[text]()`", () => {
@@ -182,14 +176,16 @@ describe("parseMarkdownTargets — skipped regions", () => {
   });
 
   it("skips links inside inline code spans", () => {
-    assert.deepEqual(parseMarkdownTargets("see `[g](./Guide.md)` not a link"), []);
+    assert.deepEqual(
+      parseMarkdownTargets("see `[g](./Guide.md)` not a link"),
+      []
+    );
   });
 
   it("indexes links outside an inline code span on the same line", () => {
-    assert.deepEqual(
-      parseMarkdownTargets("`code` then [g](./Guide.md)"),
-      [{ target: "./Guide.md", heading: null, line: 0 }]
-    );
+    assert.deepEqual(parseMarkdownTargets("`code` then [g](./Guide.md)"), [
+      { target: "./Guide.md", heading: null, line: 0 }
+    ]);
   });
 
   it("does not treat unterminated front matter as content", () => {

@@ -69,12 +69,32 @@ export class BacklinksTreeProvider
       vscode.TreeItemCollapsibleState.None
     );
     const lineLabel = `line ${element.line + 1}`;
-    item.description =
-      element.snippet.length > 0
-        ? `${lineLabel} · ${element.snippet}`
-        : lineLabel;
+    // T-4.1c: surface the target heading in the description suffix *only*
+    // when heading-line resolution found it. A heading miss (lookup ran,
+    // heading not found) degrades to no suffix — matches the M4.2 hover-
+    // preview "unresolved heading → top-of-note" policy. A link with no
+    // heading anchor at all also yields no suffix.
+    const headingSuffix =
+      element.heading !== null &&
+      element.targetLine !== undefined &&
+      element.targetLine !== null
+        ? ` → ${element.heading}`
+        : "";
+    const snippetSuffix =
+      element.snippet.length > 0 ? ` · ${element.snippet}` : "";
+    item.description = `${lineLabel}${headingSuffix}${snippetSuffix}`;
+    // Tooltip carries the target line number when known, so a user
+    // skimming the tree can see *where* in the target the heading lives
+    // before clicking. The body still shows the source-side snippet — the
+    // tree click opens the *source* note, not the target.
+    const tooltipHeadingSuffix =
+      element.heading !== null &&
+      element.targetLine !== undefined &&
+      element.targetLine !== null
+        ? ` → ${element.heading} (line ${element.targetLine + 1})`
+        : "";
     item.tooltip = new vscode.MarkdownString(
-      `${vscode.workspace.asRelativePath(element.sourceUri)} · ${lineLabel}\n\n${
+      `${vscode.workspace.asRelativePath(element.sourceUri)} · ${lineLabel}${tooltipHeadingSuffix}\n\n${
         element.snippet
       }`
     );

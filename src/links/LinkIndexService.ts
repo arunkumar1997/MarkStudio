@@ -42,13 +42,17 @@ const SCAN_BATCH_SIZE = 24;
 // the pure index's path string. `kind` carries the link kind through for the
 // Backlinks panel's icon vocabulary (ADR-0024); omitted for wiki-link
 // backlinks so the pre-Sprint-6 shape is preserved (consumers read `kind ??
-// "wiki"`).
+// "wiki"`). `targetLine` is the 0-based line of the target heading in the
+// *target* note (T-4.1c) when the backlink's `heading` resolved, `null` when
+// the lookup ran but the heading was not found, and `undefined` when no
+// heading lookup applied. Consumers should read `targetLine ?? null`.
 export interface ResolvedBacklink {
   readonly sourceUri: vscode.Uri;
   readonly line: number;
   readonly snippet: string;
   readonly heading: string | null;
   readonly kind?: "wiki" | "markdown";
+  readonly targetLine?: number | null;
 }
 
 export class LinkIndexService implements vscode.Disposable {
@@ -102,25 +106,31 @@ export class LinkIndexService implements vscode.Disposable {
     for (const backlink of this.index.backlinksFor(this.pathOf(uri))) {
       const sourceUri = this.uriByPath.get(backlink.sourcePath);
       if (sourceUri) {
-        // Mirror the pure index's shape: emit `kind` only when present (i.e.
-        // Markdown-link backlinks) so the pre-Sprint-6 wiki-only shape is
-        // byte-for-byte preserved for existing assertions.
-        resolved.push(
-          backlink.kind === "markdown"
-            ? {
-                sourceUri,
-                line: backlink.line,
-                snippet: backlink.snippet,
-                heading: backlink.heading,
-                kind: "markdown"
-              }
-            : {
-                sourceUri,
-                line: backlink.line,
-                snippet: backlink.snippet,
-                heading: backlink.heading
-              }
-        );
+        // Build the resolved record by hand so absent optional fields stay
+        // absent (not `undefined`) — the pre-Sprint-6 wiki/no-heading shape
+        // is byte-for-byte preserved when neither `kind` nor `targetLine`
+        // applies. The `Backlink` from the pure index already follows the
+        // same discipline, so we just thread fields through.
+        const out: {
+          sourceUri: vscode.Uri;
+          line: number;
+          snippet: string;
+          heading: string | null;
+          kind?: "wiki" | "markdown";
+          targetLine?: number | null;
+        } = {
+          sourceUri,
+          line: backlink.line,
+          snippet: backlink.snippet,
+          heading: backlink.heading
+        };
+        if (backlink.kind === "markdown") {
+          out.kind = "markdown";
+        }
+        if (backlink.targetLine !== undefined) {
+          out.targetLine = backlink.targetLine;
+        }
+        resolved.push(out);
       }
     }
     return resolved;
@@ -220,7 +230,10 @@ export class LinkIndexService implements vscode.Disposable {
   }
 
   // Read, parse, and cache a single file's links. Failures (e.g. a file deleted
-  // mid-scan) leave the note absent rather than aborting the scan.
+  // mid-scan) leave the note absent rather than aborting the scan. The note's
+  // full text is cached alongside its parsed links so the reverse-index build
+  // pass can resolve heading anchors in *target* notes (T-4.1c) without
+  // re-reading from disk.
   private async indexFile(uri: vscode.Uri): Promise<void> {
     let text: string;
     try {
@@ -231,7 +244,7 @@ export class LinkIndexService implements vscode.Disposable {
     }
     const path = this.pathOf(uri);
     this.uriByPath.set(path, uri);
-    this.notes.set(path, { path, links: extractLinks(text) });
+    this.notes.set(path, { path, text, links: extractLinks(text) });
   }
 
   private async onFileTouched(uri: vscode.Uri): Promise<void> {

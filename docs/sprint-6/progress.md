@@ -22,24 +22,25 @@
 
 ## Verification (local)
 
-- `npm run lint` — ✅ clean as of Phase B
-- `npm run typecheck` — ✅ clean as of Phase B
-- `npm run typecheck:test` — ✅ clean as of Phase B
-- `npm run build` — ✅ clean as of Phase B
-- `npm test` — ✅ 290 unit + 65 integration (baseline 257 + 65 → +33 unit from `parseMarkdownTargets`)
-- `npm run test:exthost` — ✅ 13 (unchanged — no new host surface this phase)
+- `npm run lint` — ✅ clean as of Phase C
+- `npm run typecheck` — ✅ clean as of Phase C
+- `npm run typecheck:test` — ✅ clean as of Phase C
+- `npm run build` — ✅ clean as of Phase C
+- `npm test` — ✅ 306 unit + 65 integration (baseline 257 + 65 → +33 unit Phase B + +16 unit Phase C)
+- `npm run test:exthost` — ✅ 13 (unchanged — no new host surface)
 
 ## Commits
 
 * `2fb1537` — `docs(sprint-6): plan + progress tracker` — sprint plan + tracker landed on `feature/sprint-6`.
 * `c0c27d5` — `docs(sprint-6): ADR-0024 + design v2 section (Phase A)` — Phase A close-out.
-* _(Phase B finish)_ — `feat(links): Markdown-link backlinks (T-4.1a, Phase B)` — to be recorded after the commit.
+* `7eb1dcf` — `feat(links): Markdown-link backlinks (T-4.1a, Phase B)` — Phase B close-out.
+* _(Phase C finish)_ — `feat(links): heading-level backlinks (T-4.1c, Phase C)` — to be recorded after the commit.
 
 ## Bundle sizes (running)
 
 | Bundle | Baseline (post-Sprint-5) | After Sprint 6 | Delta |
 |---|---|---|---|
-| `dist/extension.js` | 65.5 kB | 73.4 kB (Phase B) | +7.9 kB (over plan §7's ~+2 kB target — `parseMarkdownTargets` covers full CommonMark inline-link grammar: balanced parens, angle-bracket form, optional title, escape, fence / front-matter / inline-code skipping. Phase C will add the heading-line cache.) |
+| `dist/extension.js` | 65.5 kB | 74.9 kB (Phase C) | +9.4 kB total (Phase B +7.9 kB for `parseMarkdownTargets` CommonMark grammar; Phase C +1.5 kB for heading-line cache + `composeBacklink` widening. Over plan §7's ~+2 kB target by design — the Markdown parser is the bulk and is non-negotiable.) |
 | `dist/webview.js` | 2.0 MB | unchanged | 0 |
 | `dist/mermaid.js` | 7.5 MB | unchanged | 0 |
 | `dist/graph.js` | 19.3 kB | unchanged | 0 |
