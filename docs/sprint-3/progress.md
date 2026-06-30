@@ -41,7 +41,10 @@
 ## Bugs found
 | # | Description | Severity | Status | Fix |
 |---|---|---|---|---|
-| — | _(none)_ | | | |
+| 2 | `openWikiLink` leaked an unhandled promise rejection when a *resolved* target failed to open (`openTextDocument`/`showTextDocument` reject — e.g. file deleted inside the ~250 ms watcher debounce window, index still lists it). Violated the "graceful degradation, never throws" DoD. | Minor (non-blocking) | ✅ Fixed (`feature/sprint-3`) | Wrapped the open/reveal block (`openTextDocument` → `showTextDocument`) in `try/catch` in `src/editor/MarkStudioEditorProvider.ts`; on catch it degrades like the unresolved path — `window.setStatusBarMessage("MarkStudio: could not open note for [[…]]", 4000)`, no modal, no throw. Doc comment updated to keep its "never throws" claim true. No regression test added — see note below. |
+
+> **Bug #2 — test note.** The open-failure path is `vscode`-API glue on a **private** `openWikiLink`, invoked fire-and-forget from the message switch inside `resolveCustomTextEditor`. Reaching it from a unit seam would require adding a large mock surface (`window.setStatusBarMessage` / `showTextDocument`, `Uri`, `EventEmitter`, `registerCustomEditorProvider`) plus reflection into a private method; the exthost seam can't post the `openWikiLink` webview message (isolated iframe) and can't deterministically race a delete inside the debounce window. Per the task's "don't force disproportionate mock surface" guidance, the path stays in the **manual QA matrix** (Phase 8 EDH: click a `[[note]]`, delete the file mid-debounce → expect transient status-bar fallback, no thrown error). Test counts unchanged: 152 unit · 45 integration · 4 exthost.
+
 
 ## Open items
 * Manual F5: confirm the delegated listener survives a `setContent` reconcile (bound once to `shell.previewPane`, which is never replaced — expected to hold).

@@ -127,10 +127,14 @@ export class MarkStudioEditorProvider
   // so navigation and backlinks agree. When a `heading` is given, the heading's
   // line is revealed (falling back to the top of the file if it is not found);
   // otherwise the file opens at line 0. An ambiguous basename opens the first
-  // match; an unresolved target shows a transient status-bar message and never
-  // throws. The note opens in the built-in text editor (the custom editor is
-  // registered at `priority: "option"`, so `showTextDocument` does not hijack
-  // it) — the reliable way to reveal a specific line.
+  // match; an unresolved target shows a transient status-bar message. If the
+  // resolved target fails to open (e.g. it was deleted inside the watcher
+  // debounce window, so the index still lists it), the same transient
+  // status-bar fallback is shown. This method never throws — the caller invokes
+  // it fire-and-forget via `void`. The note opens in the built-in text editor
+  // (the custom editor is registered at `priority: "option"`, so
+  // `showTextDocument` does not hijack it) — the reliable way to reveal a
+  // specific line.
   private async openWikiLink(
     fromUri: vscode.Uri,
     target: string,
@@ -146,21 +150,37 @@ export class MarkStudioEditorProvider
     }
 
     const targetUri = matches[0];
-    const targetDocument = await vscode.workspace.openTextDocument(targetUri);
 
-    let line = 0;
-    if (heading !== null && heading.length > 0) {
-      const headingLine = findHeadingLine(targetDocument.getText(), heading);
-      if (headingLine >= 0) {
-        line = headingLine;
+    try {
+      const targetDocument = await vscode.workspace.openTextDocument(targetUri);
+
+      let line = 0;
+      if (heading !== null && heading.length > 0) {
+        const headingLine = findHeadingLine(targetDocument.getText(), heading);
+        if (headingLine >= 0) {
+          line = headingLine;
+        }
       }
-    }
 
-    const safeLine = Math.max(0, Math.min(line, targetDocument.lineCount - 1));
-    const position = new vscode.Position(safeLine, 0);
-    await vscode.window.showTextDocument(targetDocument, {
-      selection: new vscode.Range(position, position)
-    });
+      const safeLine = Math.max(
+        0,
+        Math.min(line, targetDocument.lineCount - 1)
+      );
+      const position = new vscode.Position(safeLine, 0);
+      await vscode.window.showTextDocument(targetDocument, {
+        selection: new vscode.Range(position, position)
+      });
+    } catch {
+      // The index resolved a match, but opening it failed — e.g. the file was
+      // deleted inside the FileSystemWatcher debounce window, so the in-memory
+      // index still lists it. Degrade like the unresolved path: a transient
+      // status-bar message, never a throw (the caller invokes this fire-and-
+      // forget via `void`).
+      void vscode.window.setStatusBarMessage(
+        `MarkStudio: could not open note for [[${target}]]`,
+        4000
+      );
+    }
   }
 
   public resolveCustomTextEditor(
