@@ -39,6 +39,54 @@ be fixed before merge or tracked as a fast-follow at the Producer's discretion.
 
 ---
 
+## Re-verification (2026-06-30, post-#2-fix)
+
+Dev (Sage) fixed defect [#2](https://github.com/arunkumar1997/MarkStudio/issues/2)
+on `feature/sprint-3` in commit `51aea4f`. Ivy re-verified by code review +
+full automated re-run.
+
+**Code review of `openWikiLink`** ([src/editor/MarkStudioEditorProvider.ts](../../src/editor/MarkStudioEditorProvider.ts)) — confirmed:
+
+- ✅ The open/reveal block (`openTextDocument` → `findHeadingLine` →
+  `showTextDocument`) is now wrapped in a single `try { … }`.
+- ✅ The `catch` path posts the same transient
+  `vscode.window.setStatusBarMessage("MarkStudio: could not open note for [[…]]", 4000)`
+  fallback as the unresolved path and `return`s — **no throw, no modal**.
+- ✅ The unresolved early-return (`matches.length === 0` → status-bar →
+  `return`) is **unchanged**; the resolver call (`linkIndexService.resolveTarget`),
+  the `openWikiLink` message protocol, and the method signature
+  (`fromUri`, `target`, `heading`) are **untouched**.
+- ✅ `safeLine` clamp to `[0, lineCount-1]` is preserved.
+- ✅ The doc-comment's “This method never throws” claim is now **genuinely
+  accurate** — both the unresolved and resolved-but-unopenable paths degrade to
+  the same transient status-bar message; the only `await`s that could reject are
+  inside the `try`.
+
+No regression test was added — the private `vscode`-glue method isn't reachable
+from the unit/exthost seams without a disproportionate mock surface (documented
+in §3). Verdict: **#2 is resolved at the code level.** The live
+“delete `B.md` mid-debounce → status-bar fallback, no error” reproduction is a
+human EDH row (§5) Ivy cannot execute, so #2 is **code-verified but
+manually-unconfirmed** pending that one spot-check.
+
+**Automated re-run (`feature/sprint-3` @ `51aea4f`), all green:**
+
+| Stage | Command | Result | Count |
+|---|---|---|---|
+| Lint + format | `npm run lint` | ✅ PASS | eslint 0 warnings · prettier all-clean |
+| Typecheck (src) | `npm run typecheck` | ✅ PASS | tsc 0 errors |
+| Typecheck (test) | `npm run typecheck:test` | ✅ PASS | tsc 0 errors |
+| Build | `npm run build` | ✅ PASS | extension + webview + mermaid bundled |
+| Unit | `npm test` → `test:unit` | ✅ PASS | **152 / 152** (0 fail) |
+| Integration | `npm test` → `test:integration` | ✅ PASS | **45 / 45** (0 fail) |
+| Ext-host | `npm run test:exthost` | ✅ PASS | **4 / 4** (0 fail) |
+
+> Total automated: **201** (152 + 45 + 4), 0 failures — unchanged from the
+> original sign-off (the fix is a host-glue `try/catch`, not reachable by the
+> suite). **No prettier drift; no application source modified by QA.**
+
+---
+
 ## 1. Pipeline results (local, `feature/sprint-3`)
 
 | Stage | Command | Result | Count |
@@ -138,21 +186,26 @@ Each Phase-8 matrix row, with how it was verified short of a live EDH:
 
 Cannot be asserted in this environment (no interactive GUI; the actual open,
 cursor reveal, and theme rendering need a real Extension Development Host). Run
-once on a **multi-file workspace**. Each row is pass/fail:
+once on a **multi-file workspace**. Every row below is **human-only** — each
+requires a person driving a live EDH (mouse click on a rendered preview link,
+observing cursor reveal / theme rendering). A non-interactive agent **cannot**
+tick any of these; they remain unchecked until a human runs them. Each row is
+pass/fail:
 
-- [ ] **Open by name.** In note A's preview, click `[[B]]` → **B** opens in a text editor.
-- [ ] **Alias.** `[[B|see B]]` renders "see B" and still opens **B**.
-- [ ] **Heading.** `[[B#Setup]]` opens **B** with the cursor on the `## Setup` line.
-- [ ] **Heading miss.** `[[B#Nope]]` opens **B** at the top (line 0), no error.
-- [ ] **Ambiguous.** Two `B.md` in different folders → clicking `[[B]]` opens one (first match), no crash.
-- [ ] **Unresolved.** `[[DoesNotExist]]` → transient status-bar message "no note found", nothing opens, no error popup.
-- [ ] **Same-doc heading.** `[[#Heading]]` in the preview does nothing (inert).
-- [ ] **Toggle off.** Set `markstudio.preview.wikiLinks: false` → `[[B]]` renders as literal text and is not clickable.
-- [ ] **Persistence.** After an edit/patch to the preview, a wiki-link clicked later still navigates (delegated listener survives).
-- [ ] **Theme matrix.** Links read correctly in **dark**, **light**, **high-contrast** (no new styling, but confirm no regression).
-- [ ] **(Defect #2 repro, optional).** Delete `B.md` then immediately click `[[B]]` → confirm whether a status-bar message appears or the click silently no-ops (tracks [#2](https://github.com/arunkumar1997/MarkStudio/issues/2)).
+- [ ] **(human EDH) Open by name.** In note A's preview, click `[[B]]` → **B** opens in a text editor.
+- [ ] **(human EDH) Alias.** `[[B|see B]]` renders "see B" and still opens **B**.
+- [ ] **(human EDH) Heading.** `[[B#Setup]]` opens **B** with the cursor on the `## Setup` line.
+- [ ] **(human EDH) Heading miss.** `[[B#Nope]]` opens **B** at the top (line 0), no error.
+- [ ] **(human EDH) Ambiguous.** Two `B.md` in different folders → clicking `[[B]]` opens one (first match), no crash.
+- [ ] **(human EDH) Unresolved.** `[[DoesNotExist]]` → transient status-bar message "no note found", nothing opens, no error popup.
+- [ ] **(human EDH) Same-doc heading.** `[[#Heading]]` in the preview does nothing (inert).
+- [ ] **(human EDH) Toggle off.** Set `markstudio.preview.wikiLinks: false` → `[[B]]` renders as literal text and is not clickable.
+- [ ] **(human EDH) Persistence.** After an edit/patch to the preview, a wiki-link clicked later still navigates (delegated listener survives).
+- [ ] **(human EDH) Theme matrix.** Links read correctly in **dark**, **light**, **high-contrast** (no new styling, but confirm no regression).
+- [ ] **(human EDH) Defect #2 repro — now the key gate.** Delete `B.md` then immediately click `[[B]]` (inside the ~250 ms watcher-debounce window) → confirm a transient status-bar message "could not open note for [[B]]" appears and **no error is thrown**. This is the live confirmation of the `51aea4f` fix; code-verified but **manually-unconfirmed** until this row passes ([#2](https://github.com/arunkumar1997/MarkStudio/issues/2)).
 
 > Recommendation: the Producer (or Ivy) runs this once before/at merge. Spot-check, not a code gate.
+> **None of these rows may be marked passed without a human driving the EDH.**
 
 ---
 
@@ -160,9 +213,13 @@ once on a **multi-file workspace**. Each row is pass/fail:
 
 | # | Title | Severity | Status |
 |---|---|---|---|
-| [#2](https://github.com/arunkumar1997/MarkStudio/issues/2) | `openWikiLink`: resolved-but-unopenable target throws an unhandled rejection (no graceful fallback) | minor | Open |
+| [#2](https://github.com/arunkumar1997/MarkStudio/issues/2) | `openWikiLink`: resolved-but-unopenable target throws an unhandled rejection (no graceful fallback) | minor | **Fixed in `51aea4f` — code-verified; pending human EDH repro (§5)** |
 
-One minor defect. No major or blocker defects found.
+One minor defect, now **code-fixed** (open/reveal path wrapped in `try/catch`,
+degrades to the same transient status-bar fallback as the unresolved path — see
+the Re-verification note). Closure pending the live §5 repro row a human must
+run; QA recommends keeping the issue **open** until that spot-check passes. No
+major or blocker defects found.
 
 ---
 
@@ -174,7 +231,7 @@ One minor defect. No major or blocker defects found.
 | `[[B#Heading]]` reveals the heading line (fallback line 0) | ⏳ Manual (§5) — `findHeadingLine` unit-verified |
 | `[[B\|alias]]` resolves on target B | ✅ Code-verified (render carries target) |
 | Resolution relative to active note; matches the panel | ✅ Shared resolver (`resolveForward`), unit-verified |
-| Unresolved degrades gracefully; ambiguous opens first | ✅ Resolver unit-verified · ⚠️ resolved-but-unopenable → #2 |
+| Unresolved degrades gracefully; ambiguous opens first | ✅ Resolver unit-verified · resolved-but-unopenable now degrades gracefully (#2 fixed `51aea4f`, code-verified · §5 human repro pending) |
 | `openWikiLink` in the union **and** rejected when malformed | ✅ Unit-verified (guard) |
 | Only one `LinkIndexService` (shared); no second scan | ✅ Verified (hoisted to `extension.ts`) |
 | No webview recreation / new pane; single delegated listener | ✅ Verified |
@@ -186,12 +243,20 @@ One minor defect. No major or blocker defects found.
 ## 8. Sign-off
 
 **✅ PASS — WITH NOTES.** Automated DoD fully green (**201 tests, 0 failures**;
-lint + typechecks + build clean). The implementation matches the plan and every
-guardrail holds; the four testable seams are well covered; every matrix row is
-verified by code path + automated proof. One **minor** defect ([#2](https://github.com/arunkumar1997/MarkStudio/issues/2),
-non-blocking) and the outstanding live-EDH spot-check (§5) are the only notes.
-**Branch `feature/sprint-3` (PR #1) is ready for Producer merge to `main`** after
-the §5 spot-check is signed — regular `--no-ff` merge, never squash/rebase
-(plan §8). Defect #2 is the Producer's call to fix-before-merge or fast-follow.
+lint + typechecks + build clean, re-confirmed 2026-06-30 @ `51aea4f`). The
+implementation matches the plan and every guardrail holds; the four testable
+seams are well covered; every matrix row is verified by code path + automated
+proof. Defect [#2](https://github.com/arunkumar1997/MarkStudio/issues/2) (minor,
+non-blocking) is **code-fixed** in `51aea4f` and code-verified by review — the
+resolved-but-unopenable path now degrades to the same transient status-bar
+fallback, and the “never throws” contract is genuine.
+
+**The only remaining gate is the human §5 EDH spot-check** — in particular the
+live “delete `B.md` mid-debounce” repro that confirms #2 in a real Extension
+Development Host. Those rows require a human driving the GUI and **cannot** be
+ticked by a non-interactive agent. **Branch `feature/sprint-3` (PR #1) is ready
+for Producer merge to `main`** once that §5 spot-check is signed — regular
+`--no-ff` merge, never squash/rebase (plan §8). No application source was
+modified by QA.
 
 — Ivy (QA)
