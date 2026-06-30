@@ -56,4 +56,4 @@ No new dependency, setting, or command.
 
 ## Next
 
-**M4.3 — Embedded notes / transclusion.**
+**M4.4 — Graph view.** (M4.3 — transclusion was dropped from scope, 2026-06-30.)

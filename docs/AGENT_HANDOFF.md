@@ -51,7 +51,7 @@
 
 ## 3. Remaining Work for This Initiative
 
-Phase 4 continues. The next roadmap milestone is **M4.3 — Embedded notes / transclusion**, then **M4.4 — Graph view**. Tracked follow-ups (in [TODO.md](TODO.md)): T-4.1a (Markdown-link backlinks — *the index, not click-nav; click-nav is now done*), T-4.1c (heading-level backlinks), and the ADR-0021 follow-ups (quick-pick disambiguation, click-to-create, slug-based heading matching, same-document `[[#heading]]` navigation).
+Phase 4 continues. The next roadmap milestone is **M4.4 — Graph view** (M4.3 — transclusion was dropped from scope, 2026-06-30). Tracked follow-ups (in [TODO.md](TODO.md)): T-4.1a (Markdown-link backlinks — *the index, not click-nav; click-nav is now done*), T-4.1c (heading-level backlinks), and the ADR-0021 follow-ups (quick-pick disambiguation, click-to-create, slug-based heading matching, same-document `[[#heading]]` navigation).
 
 ---
 
@@ -135,14 +135,14 @@ None of these reverse the architecture; they are scoped placeholders with named 
 
 ## 10. Recommended Next Task
 
-* **Task:** Continue Phase 4 with **M4.3 — Embedded notes / transclusion**, reusing the shared `src/links/` resolver and `extractExcerpt`.
-* **Why this one:** Next roadmap milestone after backlinks + click-navigation + hover preview.
+* **Task:** Continue Phase 4 with **M4.4 — Graph view**.
+* **Why this one:** Next roadmap milestone after backlinks + click-navigation + hover preview (M4.3 — transclusion was dropped from scope, 2026-06-30).
 * **Suggested prompt:** [.ai/PROMPTS/feature.md](../.ai/PROMPTS/feature.md).
 * **Starting files to read:**
   * [PROJECT_STATUS.md](PROJECT_STATUS.md) — current snapshot
-  * [design/wiki-navigation.md](design/wiki-navigation.md) — the navigation design to build on
-  * `src/links/` — the shared resolver (`resolveForward` / `resolveTarget`) + `linkExcerpt.ts`
-  * `src/webview/preview/wikiLinkHover.ts` — the hover seam a transclusion feature would parallel
+  * [ROADMAP.md](ROADMAP.md) — Phase 4 milestones
+  * `src/links/` — the shared link index + resolver (`LinkIndexService`, `resolveTarget`, `resolveForward`)
+  * `src/outline/` — a precedent for a host-side tree view that follows the active document
 
 ---
 
