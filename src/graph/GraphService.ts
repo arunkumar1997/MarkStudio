@@ -215,11 +215,13 @@ export class GraphService implements vscode.Disposable {
 }
 
 // Thin local guard for the only inbound payloads the graph panel accepts.
+// Exported so unit tests can pin the security boundary contract without
+// driving a live WebviewPanel.
 // We deliberately do not reuse the editor-side `isWebviewToHostMessage`
 // because the editor accepts many messages (edits, layout, etc.) the graph
 // webview must never post; rejecting them at the boundary is the simplest
 // way to enforce that.
-function coerceWebviewToHostMessage(
+export function coerceWebviewToHostMessage(
   value: unknown
 ): WebviewToHostMessage | null {
   if (!value || typeof value !== "object") {

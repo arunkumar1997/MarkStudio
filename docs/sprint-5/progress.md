@@ -6,7 +6,7 @@
 
 ---
 
-## Status: 🟢 Phase C (panel + webview + esbuild) — DONE · 🟡 Phase D (more tests) — NEXT
+## Status: 🟢 Phase D (tests) — DONE · 🟡 Phase E (docs) — NEXT
 
 | # | Phase / Task | State | Owner | Notes |
 |---|---|---|---|---|
@@ -16,28 +16,31 @@
 | 3 | `graphModel.ts` (pure) — `buildGraph` + tests | ✅ Done | Sage | +18 unit tests; ASCII-codepoint sort |
 | 4 | `messages.ts` — `graphData` + `openGraphNode` + guards | ✅ Done | Sage | +9 unit tests |
 | 5 | `GraphService.ts` — panel lifecycle, debounced post, `openGraphNode` handler | ✅ Done | Sage | Commit `a804c8b`; routes through `provider.openInMarkStudio` |
-| 6 | `package.json` — `markstudio.graph.show` command | ✅ Done | Sage | category MarkStudio, codicon `type-hierarchy` |
+| 6 | `package.json` — `markstudio.graph.show` command + **editor title-bar action** | ✅ Done | Sage / Milo | Commit `48361cc` adds the title-bar icon |
 | 7 | `esbuild.js` — 4th lazy bundle `dist/graph.js` | ✅ Done | Sage | 19.3 kB; editor webview unchanged |
 | 8 | `extension.ts` — wire `GraphService` | ✅ Done | Sage | exposed on test API |
-| 9 | `forceSimulation.ts` (pure) — Fruchterman–Reingold | ✅ Done | Nova | _no unit tests yet (Phase D)_ |
+| 9 | `forceSimulation.ts` (pure) — Fruchterman–Reingold | ✅ Done | Nova | +13 unit tests in Phase D |
 | 10 | `render.ts` — Canvas2D + DOM labels, theme cache | ✅ Done | Nova + Milo | live `--vscode-*` token sampling per frame |
 | 11 | `webview/graph/main.ts` — RAF, drag/zoom/pan/hover/click, merge-by-path | ✅ Done | Nova | seedPosition (FNV-1a), 1-hop neighbour highlight |
-| 12 | Unit tests for `forceSimulation` + integration tests (jsdom) | ⬜ Pending | Ivy | depends on 9,10,11 |
-| 13 | Exthost tests: `markstudio.graph.show` + `openGraphNode` routes through `openInMarkStudio` | ⬜ Pending | Ivy | depends on 5,8 |
-| 14 | Manual F5: small/medium/large vaults; theme matrix; perf budget | ⬜ Pending | Ivy + human | depends on all impl |
-| 15 | Docs pass + TODO M4.4 Done + ROADMAP Phase 4 close + QA sign-off | ⬜ Pending | Sage + Remy | depends on 14 |
+| 12 | Unit tests: `forceSimulation` (13) + boundary guard (11) | ✅ Done | Ivy | Phase D |
+| 13 | Exthost tests: command registration, idempotency, `handleOpenGraphNode` routing, unknown-path | ✅ Done | Ivy | +4 exthost tests; F5 manual sanity passed |
+| 14 | Manual F5: small/medium/large vaults; theme matrix; perf budget | 🟡 Partial | human | Initial F5 sanity passed; full vault + theme matrix sweep is part of Phase F QA |
+| 15 | Docs pass + TODO M4.4 Done + ROADMAP Phase 4 close + QA sign-off | ⬜ Pending | Sage + Remy | Phase E |
 
 ## Verification (local)
 
 - `npm run lint` ✅ · `npm run typecheck` ✅ · `npm run typecheck:test` ✅ · `npm run build` ✅
-- `npm test` ✅ — **233 unit pass · 65 integration pass · 0 fail**
-- `npm run test:exthost` ✅ — **9 pass · 0 fail** (Phase C did not regress activation)
+- `npm test` ✅ — **257 unit pass (was 199 baseline, +58) · 65 integration pass · 0 fail**
+- `npm run test:exthost` ✅ — **13 pass (was 9 baseline, +4) · 0 fail**
 
 ## Commits
 
 - `526db18` — `docs(sprint-5): M4.4 graph view design + ADR-0023 (Phase A)`
 - `8f1523e` — `feat(graph): host-side graph model + LinkIndex.allEdges + messaging (Phase B, M4.4)`
 - `a804c8b` — `feat(graph): GraphService panel + canvas webview + esbuild bundle (Phase C, M4.4)`
+- `73f3135` — `docs(sprint-5): mark Phase C done, update bundle sizes + verification table`
+- `48361cc` — `feat(graph): editor title-bar action for Show Graph (Phase C.1, M4.4)`
+- _(pending)_ — `test(graph): forceSimulation + boundary guard + exthost coverage (Phase D, M4.4)`
 
 ## Bundle sizes after Phase C
 
