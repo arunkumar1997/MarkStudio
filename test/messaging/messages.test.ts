@@ -502,6 +502,92 @@ describe("isWebviewToHostMessage", () => {
     });
   });
 
+  describe("openMarkdownLink", () => {
+    it("accepts a complete payload with a heading", () => {
+      assert.equal(
+        isWebviewToHostMessage({
+          type: "openMarkdownLink",
+          href: "./Other.md#Section",
+          target: "./Other.md",
+          heading: "Section"
+        }),
+        true
+      );
+    });
+
+    it("accepts a payload with a null heading", () => {
+      assert.equal(
+        isWebviewToHostMessage({
+          type: "openMarkdownLink",
+          href: "./Other.md",
+          target: "./Other.md",
+          heading: null
+        }),
+        true
+      );
+    });
+
+    it("rejects a missing or non-string href", () => {
+      assert.equal(
+        isWebviewToHostMessage({
+          type: "openMarkdownLink",
+          target: "./Other.md",
+          heading: null
+        }),
+        false
+      );
+      assert.equal(
+        isWebviewToHostMessage({
+          type: "openMarkdownLink",
+          href: 5,
+          target: "./Other.md",
+          heading: null
+        }),
+        false
+      );
+    });
+
+    it("rejects a missing or non-string target", () => {
+      assert.equal(
+        isWebviewToHostMessage({
+          type: "openMarkdownLink",
+          href: "./Other.md",
+          heading: null
+        }),
+        false
+      );
+      assert.equal(
+        isWebviewToHostMessage({
+          type: "openMarkdownLink",
+          href: "./Other.md",
+          target: 42,
+          heading: null
+        }),
+        false
+      );
+    });
+
+    it("rejects a heading that is neither string nor null", () => {
+      assert.equal(
+        isWebviewToHostMessage({
+          type: "openMarkdownLink",
+          href: "./Other.md",
+          target: "./Other.md",
+          heading: 7
+        }),
+        false
+      );
+      assert.equal(
+        isWebviewToHostMessage({
+          type: "openMarkdownLink",
+          href: "./Other.md",
+          target: "./Other.md"
+        }),
+        false
+      );
+    });
+  });
+
   describe("error", () => {
     it("accepts a string message", () => {
       assert.equal(

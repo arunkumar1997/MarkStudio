@@ -10,6 +10,13 @@ import type { StateStore } from "../services/StateStore";
 import type { ConfigurationService } from "../services/ConfigurationService";
 import type { LinkIndexService } from "../links/LinkIndexService";
 
+// Defence-in-depth scheme check for `openMarkdownLink` (ADR-0021 amendment):
+// the webview already filters external schemes (`isExternalHref` in
+// `markdownLinkClick.ts`), but the host re-checks before resolving so a
+// malformed message can never round-trip an external URL into navigation.
+// Matches RFC 3986 scheme syntax.
+const EXTERNAL_HREF = /^[a-z][a-z0-9+\-.]*:/i;
+
 // One per resolved MarkStudio editor. Owns the typed `HostMessageBus` for
 // that webview and exposes the operations commands need (layout-mode switch
 // from T-106; toggle / focus seams from T-108). The provider holds a
@@ -203,6 +210,100 @@ export class MarkStudioEditorProvider
     }
   }
 
+  // Resolve a standard markdown link clicked in the preview (ADR-0021
+  // 2026-06-30 amendment, extended for standard markdown links) and open the
+  // target `.md` / `.markdown` file in MarkStudio. `href` is the raw attribute
+  // value as it appeared in the preview (used only for the user-facing
+  // fallback message), `target` is the URL-decoded path part (before `#`), and
+  // `heading` is the URL-decoded fragment or `null`. Resolution is plain URI
+  // math — *not* the workspace link index, which only knows about wiki-link
+  // basenames: a `/`-prefixed path is workspace-absolute (resolved against the
+  // source note's workspace folder, falling back to the first folder for an
+  // out-of-workspace source), and any other path is relative to the source
+  // note's directory. The resolved URI must point at an existing file inside a
+  // workspace folder; anything else degrades to the same transient status-bar
+  // message the wiki-link path uses, so a broken link is never silently
+  // navigated. Heading reveal reuses `findHeadingLine` (miss → top of file),
+  // and the open itself goes through `openInMarkStudio` so the pending-reveal
+  // handshake is identical to the wiki-link / backlinks paths. External-scheme
+  // hrefs are already filtered webview-side; a defence-in-depth scheme check
+  // here ensures a malformed message can never round-trip an external URL.
+  // Never throws — the caller invokes it fire-and-forget via `void`.
+  public async openMarkdownLink(
+    fromUri: vscode.Uri,
+    href: string,
+    target: string,
+    heading: string | null
+  ): Promise<void> {
+    if (
+      target.length === 0 ||
+      EXTERNAL_HREF.test(href) ||
+      EXTERNAL_HREF.test(target)
+    ) {
+      return;
+    }
+
+    const targetUri = this.resolveMarkdownLinkUri(fromUri, target);
+    if (targetUri === null) {
+      void vscode.window.setStatusBarMessage(
+        `MarkStudio: no note found at "${href}"`,
+        4000
+      );
+      return;
+    }
+
+    try {
+      const targetDocument = await vscode.workspace.openTextDocument(targetUri);
+
+      let line = 0;
+      if (heading !== null && heading.length > 0) {
+        const headingLine = findHeadingLine(targetDocument.getText(), heading);
+        if (headingLine >= 0) {
+          line = headingLine;
+        }
+      }
+
+      const safeLine = Math.max(
+        0,
+        Math.min(line, targetDocument.lineCount - 1)
+      );
+      await this.openInMarkStudio(targetUri, safeLine);
+    } catch {
+      void vscode.window.setStatusBarMessage(
+        `MarkStudio: could not open note at "${href}"`,
+        4000
+      );
+    }
+  }
+
+  // Resolve `target` (a path written in `fromUri`'s preview) to a candidate
+  // `.md` URI, or `null` when no workspace context is available for a
+  // workspace-absolute path. The candidate is returned even if the file does
+  // not exist on disk — the caller's `openTextDocument` is the existence
+  // check, so a broken link still surfaces the transient status-bar message.
+  private resolveMarkdownLinkUri(
+    fromUri: vscode.Uri,
+    target: string
+  ): vscode.Uri | null {
+    if (target.startsWith("/")) {
+      // Workspace-absolute: resolve against the source's workspace folder. If
+      // the source is not in any folder (e.g. an ad-hoc file open), fall back
+      // to the first workspace folder, mirroring `asRelativePath`'s preference
+      // for the active workspace.
+      const folder =
+        vscode.workspace.getWorkspaceFolder(fromUri) ??
+        vscode.workspace.workspaceFolders?.[0];
+      if (folder === undefined) {
+        return null;
+      }
+      const trimmed = target.replace(/^\/+/, "");
+      return vscode.Uri.joinPath(folder.uri, trimmed);
+    }
+
+    // Relative: resolve against the source note's containing directory.
+    return vscode.Uri.joinPath(fromUri, "..", target);
+  }
+
   // Open `targetUri` in the MarkStudio custom editor and reveal `line` (a
   // 0-based, already-clamped source line). Shared by in-preview click-
   // navigation (T-4.1b) and the Backlinks panel (T-4.1, ADR-0020) so both open
@@ -357,6 +458,14 @@ export class MarkStudioEditorProvider
           case "openWikiLink":
             void this.openWikiLink(
               document.uri,
+              message.target,
+              message.heading
+            );
+            return;
+          case "openMarkdownLink":
+            void this.openMarkdownLink(
+              document.uri,
+              message.href,
               message.target,
               message.heading
             );

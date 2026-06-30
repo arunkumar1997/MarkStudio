@@ -17,6 +17,7 @@ import {
 } from "./preview/PreviewRenderer";
 import { createScrollSync, type ScrollSync } from "./preview/scrollSync";
 import { registerWikiLinkClicks } from "./preview/wikiLinkClick";
+import { registerMarkdownLinkClicks } from "./preview/markdownLinkClick";
 import {
   registerWikiLinkHover,
   type WikiLinkHover
@@ -97,6 +98,16 @@ function mount(): void {
             // Delegated wiki-link click handling (T-4.1b). Bound once to the
             // persistent preview pane, so it survives every preview re-render.
             registerWikiLinkClicks(shell.previewPane, bus);
+            // Delegated standard-markdown-link click handling (ADR-0021
+            // 2026-06-30 amendment, extended). A click on a plain `<a href>`
+            // that resolves to a workspace `.md` file opens the target in
+            // MarkStudio via `openMarkdownLink`; external URLs, modifier-held
+            // clicks, fragment-only links, and non-markdown files are left to
+            // the webview's default behaviour. Registered after the wiki-link
+            // handler so wiki-link clicks that `preventDefault` short-circuit
+            // this listener — and the two stay strictly disjoint anyway by
+            // skipping anchors carrying `data-wikilink-target`.
+            registerMarkdownLinkClicks(shell.previewPane, bus);
             // Delegated wiki-link hover preview (T-4.2). One floating card,
             // owned here, with its own reused renderer; the hover detector
             // requests previews after a dwell and asks the card to hide on
