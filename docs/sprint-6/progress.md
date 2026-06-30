@@ -6,11 +6,11 @@
 
 ---
 
-## Status: 🟡 Phase A (design) — IN PROGRESS
+## Status: � Phase A (design) — COMPLETE → Phase B (T-4.1a host) up next
 
 | # | Phase / Task | State | Owner | Notes |
 |---|---|---|---|---|
-| **A** | **Design + ADR-0024 + `design/backlinks.md` v2 section** | 🟡 In progress | Remy / Sage | This commit lands the sprint plan; ADR-0024 + design v2 follow before code |
+| **A** | **Design + ADR-0024 + `design/backlinks.md` v2 section** | ✅ Done | Remy / Sage | Plan, ADR-0024, and design v2 section landed on `feature/sprint-6` |
 | 1 | `parseMarkdownTargets.ts` — pure extractor + tests | ⬜ Not started | Sage | Mirror `parseWikiTargets.ts` shape |
 | 2 | `linkIndex.ts` — `NoteLink.kind`, `Backlink.targetLine`, heading-line cache, `resolveMarkdownTarget` | ⬜ Not started | Sage | Additive widening only |
 | 3 | `LinkIndexService.ts` — dual-parse merge | ⬜ Not started | Sage | No new event, no new watcher |
@@ -31,7 +31,8 @@
 
 ## Commits
 
-_(none yet — first commit will be the plan + ADR-0024 + design v2 section)_
+* `2fb1537` — `docs(sprint-6): plan + progress tracker` — sprint plan + tracker landed on `feature/sprint-6`.
+* _(Phase A finish)_ — `docs(sprint-6): ADR-0024 + design v2 section (Phase A)` — to be recorded after the commit.
 
 ## Bundle sizes (running)
 
