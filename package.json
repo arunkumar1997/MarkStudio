@@ -78,6 +78,12 @@
         "command": "markstudio.focusPreview",
         "title": "Focus Preview",
         "category": "MarkStudio"
+      },
+      {
+        "command": "markstudio.graph.show",
+        "title": "Show Graph",
+        "category": "MarkStudio",
+        "icon": "$(type-hierarchy)"
       }
     ],
     "keybindings": [
