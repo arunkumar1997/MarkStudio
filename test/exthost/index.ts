@@ -8,6 +8,7 @@
 
 import { runAll } from "./harness";
 import "./suite/lifecycle.test";
+import "./suite/navigation.test";
 
 export function run(): Promise<void> {
   return runAll();

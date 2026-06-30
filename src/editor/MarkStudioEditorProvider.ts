@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { HostMessageBus } from "../messaging/HostMessageBus";
 import { MarkStudioDocument } from "./MarkStudioDocument";
 import { buildWebviewHtml } from "./webviewHtml";
+import { PendingReveals } from "./pendingReveals";
 import { findHeadingLine } from "../outline/headings";
 import { extractExcerpt } from "../links/linkExcerpt";
 import type { FocusablePane, LayoutMode } from "../messaging/messages";
@@ -93,6 +94,23 @@ export class MarkStudioEditorProvider
   private readonly activeDocumentEmitter =
     new vscode.EventEmitter<vscode.TextDocument | null>();
 
+  // Every resolved MarkStudio editor, keyed by `uri.toString()`. The custom
+  // editor is registered with `supportsMultipleEditorsPerDocument: false`, so
+  // there is at most one controller per document. Used by click-navigation and
+  // the Backlinks panel to detect an already-open target (focus + reveal in
+  // place, no duplicate) and to apply a pending reveal once a freshly opened
+  // editor reports `ready` (ADR-0021). Independent of the active-editor
+  // tracking above, which still drives commands and the word-count indicator.
+  private readonly controllersByUri = new Map<
+    string,
+    MarkStudioEditorController
+  >();
+
+  // Reveals requested for targets that were not yet open. `vscode.openWith`
+  // drives `resolveCustomTextEditor`; the recorded line is applied when that
+  // new webview reports `ready` (ADR-0021 pending-reveal handshake).
+  private readonly pendingReveals = new PendingReveals();
+
   // Fires whenever the active MarkStudio editor changes (including to none, on
   // blur or dispose). The status-bar word-count indicator (T-2.4) listens here
   // so it can reflect — and hide for — the focused document.
@@ -123,19 +141,23 @@ export class MarkStudioEditorProvider
   }
 
   // Resolve a wiki-link clicked in the preview (T-4.1b) and open the target
-  // note. `target` is resolved relative to the clicked note (`fromUri`) through
-  // the shared `LinkIndexService` — the same resolver the Backlinks panel uses,
-  // so navigation and backlinks agree. When a `heading` is given, the heading's
-  // line is revealed (falling back to the top of the file if it is not found);
-  // otherwise the file opens at line 0. An ambiguous basename opens the first
-  // match; an unresolved target shows a transient status-bar message. If the
-  // resolved target fails to open (e.g. it was deleted inside the watcher
-  // debounce window, so the index still lists it), the same transient
-  // status-bar fallback is shown. This method never throws — the caller invokes
-  // it fire-and-forget via `void`. The note opens in the built-in text editor
-  // (the custom editor is registered at `priority: "option"`, so
-  // `showTextDocument` does not hijack it) — the reliable way to reveal a
-  // specific line.
+  // note in MarkStudio. `target` is resolved relative to the clicked note
+  // (`fromUri`) through the shared `LinkIndexService` — the same resolver the
+  // Backlinks panel uses, so navigation and backlinks agree. When a `heading`
+  // is given, the heading's line is revealed (falling back to the top of the
+  // file if it is not found); otherwise the file opens at line 0. An ambiguous
+  // basename opens the first match; an unresolved target shows a transient
+  // status-bar message. If the resolved target fails to open (e.g. it was
+  // deleted inside the watcher debounce window, so the index still lists it),
+  // the same transient status-bar fallback is shown. This method never throws —
+  // the caller invokes it fire-and-forget via `void`.
+  //
+  // The note opens in the MarkStudio custom editor via `openInMarkStudio`
+  // (ADR-0021): MarkStudio is the markdown experience, so click-navigation
+  // stays in it rather than dropping the user into the raw text editor. Because
+  // a MarkStudio editor is a webview, the line is revealed through a
+  // `revealLine` message (the pending-reveal handshake) rather than
+  // `showTextDocument`'s selection.
   private async openWikiLink(
     fromUri: vscode.Uri,
     target: string,
@@ -167,10 +189,7 @@ export class MarkStudioEditorProvider
         0,
         Math.min(line, targetDocument.lineCount - 1)
       );
-      const position = new vscode.Position(safeLine, 0);
-      await vscode.window.showTextDocument(targetDocument, {
-        selection: new vscode.Range(position, position)
-      });
+      await this.openInMarkStudio(targetUri, safeLine);
     } catch {
       // The index resolved a match, but opening it failed — e.g. the file was
       // deleted inside the FileSystemWatcher debounce window, so the in-memory
@@ -182,6 +201,56 @@ export class MarkStudioEditorProvider
         4000
       );
     }
+  }
+
+  // Open `targetUri` in the MarkStudio custom editor and reveal `line` (a
+  // 0-based, already-clamped source line). Shared by in-preview click-
+  // navigation (T-4.1b) and the Backlinks panel (T-4.1, ADR-0020) so both open
+  // notes in MarkStudio rather than the built-in text editor (ADR-0021).
+  //
+  // Reveal cannot ride `showTextDocument`'s `selection` because a MarkStudio
+  // editor is a webview; instead the line is delivered as a host → webview
+  // `revealLine` message (the same one the outline tree uses). Two cases:
+  //   - Target already open: `vscode.openWith` focuses its existing tab (no
+  //     duplicate, since `supportsMultipleEditorsPerDocument: false`) and the
+  //     line is revealed immediately on the live controller.
+  //   - Target not yet open: the line is recorded in `pendingReveals` keyed by
+  //     the URI *before* `openWith`, which drives `resolveCustomTextEditor`;
+  //     the reveal is applied once that new webview reports `ready`.
+  // The caller invokes this fire-and-forget via `void`.
+  public async openInMarkStudio(
+    targetUri: vscode.Uri,
+    line: number
+  ): Promise<void> {
+    const key = targetUri.toString();
+    const existing = this.controllersByUri.get(key);
+    if (existing === undefined) {
+      // Record before opening: `openWith` may resolve the new editor and have
+      // it report `ready` before the await below returns.
+      this.pendingReveals.set(key, line);
+    }
+
+    await vscode.commands.executeCommand(
+      "vscode.openWith",
+      targetUri,
+      MarkStudioEditorProvider.viewType
+    );
+
+    if (existing !== undefined) {
+      existing.revealLine(line);
+    }
+  }
+
+  // Apply a pending reveal for `uri` once its webview reports `ready`. A no-op
+  // when no reveal is pending or the controller is gone. Part of the ADR-0021
+  // pending-reveal handshake.
+  private applyPendingReveal(uri: vscode.Uri): void {
+    const key = uri.toString();
+    const line = this.pendingReveals.take(key);
+    if (line === undefined) {
+      return;
+    }
+    this.controllersByUri.get(key)?.revealLine(line);
   }
 
   // Resolve a hovered wiki-link (T-4.2) and reply with a capped Markdown
@@ -273,6 +342,10 @@ export class MarkStudioEditorProvider
         switch (message.type) {
           case "ready":
             sendInit();
+            // Apply a reveal requested before this editor existed (ADR-0021
+            // pending-reveal handshake): the webview is now ready to receive
+            // the `revealLine` message.
+            this.applyPendingReveal(document.uri);
             return;
           case "edit":
             lastWebviewEditText = message.text;
@@ -307,6 +380,7 @@ export class MarkStudioEditorProvider
     );
 
     const controller = new MarkStudioEditorController(bus);
+    this.controllersByUri.set(document.uri.toString(), controller);
     const activate = (): void => {
       this.activeController = controller;
       this.setActiveDocument(textDocument);
@@ -357,6 +431,13 @@ export class MarkStudioEditorProvider
 
     webviewPanel.onDidDispose(() => {
       deactivateIfCurrent();
+      const key = document.uri.toString();
+      if (this.controllersByUri.get(key) === controller) {
+        this.controllersByUri.delete(key);
+      }
+      // Drop a reveal that was queued for an editor that closed before it ever
+      // reported `ready`, so it cannot leak onto a later editor for this URI.
+      this.pendingReveals.clear(key);
       viewStateSubscription.dispose();
       changeSubscription.dispose();
       configSubscription.dispose();
