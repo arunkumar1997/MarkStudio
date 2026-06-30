@@ -94,6 +94,7 @@ src/
 ├── links/                        # Host-side workspace link index + backlinks (T-4.1)
 │   ├── parseWikiTargets.ts           # pure wiki-link target extractor (no `vscode`/DOM)
 │   ├── linkIndex.ts                  # pure reverse index + basename resolver (no `vscode`/fs)
+│   ├── linkExcerpt.ts                # pure capped excerpt + heading-section slice for hover (M4.2)
 │   ├── LinkIndexService.ts           # async scan + FileSystemWatcher + debounce + onDidChangeIndex
 │   ├── BacklinksTreeProvider.ts      # vscode.TreeDataProvider backing the backlinks tree view
 │   └── registerBacklinks.ts          # wires the TreeView, follows the active doc, open command
@@ -111,7 +112,9 @@ src/
     ├── preview/
     │   ├── PreviewRenderer.ts        # markdown-it instance + incremental DOM patching
     │   ├── scrollSync.ts             # editor ⇄ preview scroll synchronization
-    │   └── wikiLinkClick.ts          # delegated [[link]] click → openWikiLink message (T-4.1b)
+    │   ├── wikiLinkClick.ts          # delegated [[link]] click → openWikiLink message (T-4.1b)
+    │   ├── wikiLinkHover.ts          # delegated [[link]] hover (dwell) → requestLinkPreview (M4.2)
+    │   └── HoverCard.ts              # floating hover-preview card; renders excerpt via PreviewRenderer (M4.2)
     ├── state/
     │   └── viewState.ts              # vscode.setState()/getState() shape + helpers
     └── theme/
@@ -141,7 +144,8 @@ Files are intentionally small and single-purpose. If a file grows past a single 
 | `WordCountStatusBar` | Show word count + reading time for the active MarkStudio document in a native status-bar item (T-2.4) | Add custom webview chrome; recount synchronously on every keystroke |
 | `OutlineTreeProvider` / `registerOutline` | Back a native tree view with the active document's heading outline; navigate the editor on click (T-2.2) | Render the outline inside the webview; parse via the webview tokeniser |
 | `parseWikiTargets` / `linkIndex` | **Pure** wiki-link target extraction + reverse-index/basename resolver feeding the backlinks panel (T-4.1) and in-preview navigation via `resolveForward` (T-4.1b) | Import `vscode`/DOM; touch the file system directly |
-| `LinkIndexService` | Async, batched workspace scan + `FileSystemWatcher` + debounced incremental rebuild; fire `onDidChangeIndex`; resolve a clicked target to URIs via `resolveTarget` (T-4.1, T-4.1b, ADR-0020/0021). **One instance**, owned by `extension.ts`, injected into both the backlinks registration and the editor provider | Block activation; re-scan everything on each change; be instantiated more than once |
+| `linkExcerpt` | **Pure** capped excerpt extraction for the hover card: top-of-note or `#heading`-section slice (reuses `parseHeadings` / `findHeadingLine`), capped to ≤ 60 lines / ≤ 2,000 chars (M4.2, ADR-0022) | Import `vscode`/DOM; touch the file system |
+| `LinkIndexService` | Async, batched workspace scan + `FileSystemWatcher` + debounced incremental rebuild; fire `onDidChangeIndex`; resolve a clicked **or hovered** target to URIs via `resolveTarget` (T-4.1, T-4.1b, M4.2, ADR-0020/0021/0022). **One instance**, owned by `extension.ts`, injected into both the backlinks registration and the editor provider | Block activation; re-scan everything on each change; be instantiated more than once |
 | `BacklinksTreeProvider` / `registerBacklinks` | Back a native tree view with the notes that link to the active note; open the source at the linking line on click (T-4.1) | Render the panel inside the webview; index synchronously on the activation path |
 
 ### 4.2 Webview

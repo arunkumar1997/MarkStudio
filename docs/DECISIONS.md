@@ -29,6 +29,7 @@ The foundational ADRs below (0001–0006) encode the non-negotiable rules from [
 | [0019](#adr-0019-footnotes--gfm-completeness-plugin-for-footnotes-built-ins--an-in-tree-rule-for-the-rest) | Footnotes & GFM completeness: plugin for footnotes, built-ins + an in-tree rule for the rest | Accepted |
 | [0020](#adr-0020-host-side-link-index-with-a-case-insensitive-basename-resolver-behind-a-filesystemwatcher) | Host-side link index with a case-insensitive basename resolver behind a `FileSystemWatcher` | Accepted |
 | [0021](#adr-0021-in-preview-wiki-link-navigation-via-a-shared-host-side-resolver-and-an-openwikilink-message) | In-preview wiki-link navigation via a shared host-side resolver and an `openWikiLink` message | Accepted |
+| [0022](#adr-0022-hover-preview-for-wiki-links-host-ships-markdown-text-webview-renders-it) | Hover preview for wiki-links: host ships Markdown text, webview renders it | Accepted |
 
 ---
 
@@ -1036,3 +1037,65 @@ Not a migration. `extension.ts` now creates the single `LinkIndexService`, calls
 * [api/message-protocol.md](api/message-protocol.md) — `openWikiLink`
 * [ROADMAP.md](ROADMAP.md) — Phase 4
 * [TODO.md](TODO.md) — T-4.1b
+
+---
+
+## ADR-0022: Hover preview for wiki-links: host ships Markdown text, webview renders it
+
+### Status
+`Accepted`
+
+### Date
+2026-06-30
+
+### Context
+**M4.2** (Phase 4) is **hover preview for links**: resting the pointer on a rendered wiki-link in the preview pane shows a floating card previewing the target note — the read-side counterpart to T-4.1b's click-to-open (ADR-0021). The resolver (ADR-0020), the heading scanner (`findHeadingLine`, ADR-0021), and the persistent preview pane with its delegated-listener pattern (ADR-0002/0021) all already exist. What is new is a **read** path: the host must fetch the target note's content and the webview must show an excerpt of it next to the anchor.
+
+Three project-specific questions had to be settled: (1) **what the host ships** — rendered HTML or Markdown source; (2) **how the request is shaped and made** — given the preview DOM is patched continuously (ADR-0008) and the webview must not be recreated (ADR-0002); and (3) **how much content** crosses the boundary, since a note can be arbitrarily large.
+
+### Decision
+1. **The host ships Markdown *text*, not HTML; the webview renders it with its own markdown-it renderer.** On a hover request the host resolves + reads the target, extracts a capped Markdown excerpt, and ships that **text**; the webview renders it through a dedicated instance of the **existing** `PreviewRenderer` (`createPreviewRenderer`) mounted in the card. This inherits the main preview's theming, plugin pipeline, and — critically — its `html: false` safety, so a previewed note can never inject raw HTML into the host's webview. The host never serialises DOM/HTML across the protocol.
+2. **Two new typed, guarded messages.** `requestLinkPreview { target, heading }` (webview → host) is posted after a short **dwell** (~300 ms) by a single delegated `pointerover`/`pointerout` pair on the persistent preview pane (`registerWikiLinkHover`), mirroring T-4.1b's click delegation; it is boundary-guarded exactly like `openWikiLink` (CODING_GUIDELINES §9). `linkPreviewContent { target, heading, status, text?, title? }` (host → webview) carries the result: `status: "ok"` with a capped `text` excerpt and the note's `title`, or `status: "missing"` for a quiet "no note found" card. `target`/`heading` echo the request so the webview can drop a **stale** reply (the pointer may have moved on).
+3. **Reuse the shared resolver, heading scanner, and renderer — no new primitive.** Resolution is `LinkIndexService.resolveTarget` (open-first on ambiguity, identical to click-nav); the `#heading` section slice reuses `parseHeadings` + `findHeadingLine` in a new **pure** `src/links/linkExcerpt.ts`; rendering reuses `PreviewRenderer`. Hover, click, and backlinks all resolve through one index.
+4. **Capped excerpt (Producer decision).** `extractExcerpt(text, heading)` returns the top of the note, or — when a `heading` is given — that heading's section (from the heading line to the next same-or-higher heading, falling back to the top when the heading is absent), then caps to **≤ 60 lines or ≤ 2,000 characters, whichever bites first**. The cap keeps the `linkPreviewContent` message small and the card a *preview*, not a transclusion (that is M4.3).
+5. **Never throw; degrade to `missing`.** An unresolved target — or a read that fails (e.g. the file was deleted inside the watcher debounce window, so the index still lists it; the same lesson as defect #2) — posts `status: "missing"` rather than leaking an unhandled rejection.
+6. **No new setting; static snapshot.** Gated by the existing `markstudio.preview.wikiLinks` (off ⇒ no anchors ⇒ nothing to hover). The card is a snapshot taken at hover time — no live re-render, no nested hover, no prefetch/LRU cache this sprint.
+
+### Alternatives Considered
+1. **Host renders the excerpt to HTML and ships markup** — Rejected: it would duplicate the preview's render pipeline on the host, diverge in theming, and reintroduce the raw-HTML injection surface that `html: false` closes. Shipping text and rendering webview-side keeps one renderer and one safety posture.
+2. **Reuse `openWikiLink` / overload an existing message** — Rejected: hover is a distinct read intent with a *reply*; a request/response pair of its own typed, guarded messages keeps the protocol honest (as ADR-0021 chose for the click).
+3. **Per-anchor hover listeners** — Rejected: the same reason as the click handler — one delegated pair on the persistent pane survives every incremental patch (ADR-0002/0008) and keeps the hot render path untouched.
+4. **Ship the whole note / no cap** — Rejected: a large note would bloat the message and the card; a bounded excerpt is enough for a preview, and full inline content is M4.3 (transclusion).
+5. **An own setting (`markstudio.preview.linkHoverPreview`)** — Deferred: gating by `wikiLinks` is sufficient; revisit only if QA finds the card intrusive.
+6. **A prefetch / LRU cache of excerpts** — Deferred: resolution + read happen once per hover after the dwell; a trivial stale-response guard is enough. Caching is a later refinement.
+
+### Reasoning
+Shipping Markdown text and rendering it with the same `PreviewRenderer` is the single most consequential choice: it gives the card the main preview's look and its `html: false` guarantee for free, with zero duplicated render logic. A dedicated request/response message pair, boundary-guarded like `openWikiLink`, keeps the untrusted boundary honest while echoing `target`/`heading` makes stale-response handling trivial. Reusing the resolver, heading scanner, and renderer means hover agrees with click and backlinks by construction. The line/char cap bounds both the message and the card, and degrading to `missing` on any failure keeps a hover from ever crashing the webview.
+
+### Consequences
+**Positive:** Obsidian-style hover preview that reuses the shared resolver, heading scanner, and renderer — no new resolution/render primitive, one index, one safety posture. The two new messages are small and guarded; the persistent preview and CodeMirror are untouched (no recreation). Host bundle grows from **~44.0 KB to ~47.6 KB** (+~3.6 KB for the excerpt extractor + hover handler).
+**Negative / Trade-offs:** The card is a static snapshot (no live update while the target changes); ambiguous basenames preview the first match; nested hover (hovering a link inside a card) is inert; very large sections are truncated to the cap. All are deferred, not blocking.
+**Neutral:** New `RequestLinkPreviewMessage` + `LinkPreviewContentMessage` in the protocol; new pure `src/links/linkExcerpt.ts`; new `src/webview/preview/wikiLinkHover.ts` + `src/webview/preview/HoverCard.ts`; a `requestLinkPreview` handler in `MarkStudioEditorProvider`. No new dependency, no new setting, no new command.
+
+### Compliance Impact
+No rule bent. Upholds ADR-0001 (the host reads notes via `openTextDocument`), ADR-0002 (the webview is never recreated; one delegated `pointerover`/`pointerout` pair on the persistent pane; preview is a `postMessage`, not a reload), ADR-0004 (reuses the M4.1 index/watcher), ADR-0005 (vanilla host + webview code, one new pure helper), and ADR-0008 (the host ships text; the webview's `html: false` renderer is the only thing that produces DOM). It realises ADR-0020's "hover preview M4.2 reuses this resolver" follow-up.
+
+### Migration Plan
+Not a migration. The webview mounts `registerWikiLinkHover(previewPane, bus, …)` + one `createHoverCard(...)` next to `registerWikiLinkClicks`; `MarkStudioEditorProvider` gains a `requestLinkPreview` case that posts `linkPreviewContent`. No existing behaviour changes; no setting or command added.
+
+### Follow-Ups
+* An optional `markstudio.preview.linkHoverPreview` toggle if the card proves intrusive.
+* A small LRU cache / prefetch of excerpts if hover latency matters on large vaults.
+* Source-pane (CodeMirror) hover preview — a separate seam from the preview-pane hover.
+* Nested hover (previewing a link inside a hover card).
+
+### References
+* [ADR-0001](#adr-0001-use-the-custom-editor-api)
+* [ADR-0002](#adr-0002-one-persistent-webview-retained-when-hidden)
+* [ADR-0008](#adr-0008-markdown-it-package-and-incremental-block-level-preview-patching)
+* [ADR-0020](#adr-0020-host-side-link-index-with-a-case-insensitive-basename-resolver-behind-a-filesystemwatcher)
+* [ADR-0021](#adr-0021-in-preview-wiki-link-navigation-via-a-shared-host-side-resolver-and-an-openwikilink-message)
+* [design/wiki-hover.md](design/wiki-hover.md)
+* [api/message-protocol.md](api/message-protocol.md) — `requestLinkPreview` / `linkPreviewContent`
+* [ROADMAP.md](ROADMAP.md) — Phase 4
+* [TODO.md](TODO.md) — M4.2

@@ -17,6 +17,11 @@ import {
 } from "./preview/PreviewRenderer";
 import { createScrollSync, type ScrollSync } from "./preview/scrollSync";
 import { registerWikiLinkClicks } from "./preview/wikiLinkClick";
+import {
+  registerWikiLinkHover,
+  type WikiLinkHover
+} from "./preview/wikiLinkHover";
+import { createHoverCard, type HoverCard } from "./preview/HoverCard";
 import { createAppShell, type AppShell } from "./app/AppShell";
 import { createViewStateStore } from "./state/viewState";
 
@@ -32,6 +37,9 @@ function mount(): void {
   let shell: AppShell | null = null;
   let preview: PreviewRenderer | null = null;
   let scrollSync: ScrollSync | null = null;
+  let hoverCard: HoverCard | null = null;
+  let hoverPreview: PreviewRenderer | null = null;
+  let hover: WikiLinkHover | null = null;
 
   const bus = new WebviewMessageBus(
     (message) => {
@@ -89,6 +97,19 @@ function mount(): void {
             // Delegated wiki-link click handling (T-4.1b). Bound once to the
             // persistent preview pane, so it survives every preview re-render.
             registerWikiLinkClicks(shell.previewPane, bus);
+            // Delegated wiki-link hover preview (T-4.2). One floating card,
+            // owned here, with its own reused renderer; the hover detector
+            // requests previews after a dwell and asks the card to hide on
+            // leave.
+            hoverCard = createHoverCard({ parent: root });
+            hoverPreview = createPreviewRenderer(
+              hoverCard.contentElement,
+              message.config
+            );
+            hover = registerWikiLinkHover(shell.previewPane, bus, {
+              onRequestHide: () => hoverCard?.scheduleHide(),
+              onCancelHide: () => hoverCard?.cancelHide()
+            });
             root.setAttribute("aria-busy", "false");
           } else {
             editor?.setContentFromHost(message.text);
@@ -120,6 +141,7 @@ function mount(): void {
         case "configChanged":
           editor?.setConfig(message.config);
           preview?.setConfig(message.config);
+          hoverPreview?.setConfig(message.config);
           return;
         case "revealLine":
           // Navigation from the document-outline tree (T-2.2). Make sure the
@@ -130,6 +152,26 @@ function mount(): void {
           }
           editor?.revealLine(message.line);
           return;
+        case "linkPreviewContent": {
+          // Route a host preview reply to the hover card (T-4.2). Drop a stale
+          // reply: the pointer may have left the link, or moved to another one,
+          // before this arrived — only render when it still matches the anchor
+          // the pointer is resting on.
+          const anchor = hover?.getActiveAnchor() ?? null;
+          if (
+            anchor === null ||
+            !hover?.matchesActiveRequest(message.target, message.heading)
+          ) {
+            return;
+          }
+          if (message.status === "ok") {
+            hoverPreview?.update(message.text ?? "");
+            hoverCard?.showContent(anchor);
+          } else {
+            hoverCard?.showMissing(anchor);
+          }
+          return;
+        }
         case "error":
           console.error(`[markstudio] host error: ${message.message}`);
           return;

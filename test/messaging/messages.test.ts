@@ -227,6 +227,93 @@ describe("isHostToWebviewMessage", () => {
       );
     });
   });
+
+  describe("linkPreviewContent", () => {
+    it("accepts an ok reply with text and title", () => {
+      assert.equal(
+        isHostToWebviewMessage({
+          type: "linkPreviewContent",
+          target: "Note",
+          heading: "Section",
+          status: "ok",
+          text: "# Section\n\nBody.",
+          title: "Note"
+        }),
+        true
+      );
+    });
+
+    it("accepts a missing reply with no text/title", () => {
+      assert.equal(
+        isHostToWebviewMessage({
+          type: "linkPreviewContent",
+          target: "Note",
+          heading: null,
+          status: "missing"
+        }),
+        true
+      );
+    });
+
+    it("rejects an unknown status", () => {
+      assert.equal(
+        isHostToWebviewMessage({
+          type: "linkPreviewContent",
+          target: "Note",
+          heading: null,
+          status: "error"
+        }),
+        false
+      );
+    });
+
+    it("rejects a non-string target", () => {
+      assert.equal(
+        isHostToWebviewMessage({
+          type: "linkPreviewContent",
+          target: 7,
+          heading: null,
+          status: "ok"
+        }),
+        false
+      );
+    });
+
+    it("rejects a heading that is neither string nor null", () => {
+      assert.equal(
+        isHostToWebviewMessage({
+          type: "linkPreviewContent",
+          target: "Note",
+          heading: 7,
+          status: "ok"
+        }),
+        false
+      );
+    });
+
+    it("rejects a non-string text or title", () => {
+      assert.equal(
+        isHostToWebviewMessage({
+          type: "linkPreviewContent",
+          target: "Note",
+          heading: null,
+          status: "ok",
+          text: 1
+        }),
+        false
+      );
+      assert.equal(
+        isHostToWebviewMessage({
+          type: "linkPreviewContent",
+          target: "Note",
+          heading: null,
+          status: "ok",
+          title: 1
+        }),
+        false
+      );
+    });
+  });
 });
 
 describe("isWebviewToHostMessage", () => {
@@ -360,6 +447,56 @@ describe("isWebviewToHostMessage", () => {
       );
       assert.equal(
         isWebviewToHostMessage({ type: "openWikiLink", target: "Note" }),
+        false
+      );
+    });
+  });
+
+  describe("requestLinkPreview", () => {
+    it("accepts a target with a heading", () => {
+      assert.equal(
+        isWebviewToHostMessage({
+          type: "requestLinkPreview",
+          target: "Note",
+          heading: "Section"
+        }),
+        true
+      );
+    });
+
+    it("accepts a target with a null heading", () => {
+      assert.equal(
+        isWebviewToHostMessage({
+          type: "requestLinkPreview",
+          target: "Note",
+          heading: null
+        }),
+        true
+      );
+    });
+
+    it("rejects a missing or non-string target", () => {
+      assert.equal(
+        isWebviewToHostMessage({ type: "requestLinkPreview", heading: null }),
+        false
+      );
+      assert.equal(
+        isWebviewToHostMessage({
+          type: "requestLinkPreview",
+          target: 42,
+          heading: null
+        }),
+        false
+      );
+    });
+
+    it("rejects a heading that is neither string nor null", () => {
+      assert.equal(
+        isWebviewToHostMessage({
+          type: "requestLinkPreview",
+          target: "Note",
+          heading: 7
+        }),
         false
       );
     });

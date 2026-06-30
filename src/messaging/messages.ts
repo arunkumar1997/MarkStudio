@@ -141,6 +141,24 @@ export interface RevealLineMessage {
   readonly line: number;
 }
 
+// Host reply to a `requestLinkPreview` (T-4.2). Carries the previewed note's
+// content for the hover card. `target`/`heading` echo the request so the
+// webview can drop a stale response (the pointer may have moved to another
+// link before this arrived). `status` is `"ok"` when the target resolved and
+// was read — `text` is then a capped Markdown excerpt (top of the note, or the
+// `#heading` section) and `title` the resolved note's basename — or `"missing"`
+// when nothing resolved (or the read failed), in which case the webview shows a
+// quiet "no note found" card. Plain JSON: the host renders nothing; the webview
+// renders `text` with its own markdown-it renderer (`html: false` preserved).
+export interface LinkPreviewContentMessage {
+  readonly type: "linkPreviewContent";
+  readonly target: string;
+  readonly heading: string | null;
+  readonly status: "ok" | "missing";
+  readonly text?: string;
+  readonly title?: string;
+}
+
 // Either direction. Carries a human-readable diagnostic.
 export interface ErrorMessage {
   readonly type: "error";
@@ -156,6 +174,7 @@ export type HostToWebviewMessage =
   | FocusPaneMessage
   | ConfigChangedMessage
   | RevealLineMessage
+  | LinkPreviewContentMessage
   | ErrorMessage;
 
 // ─── Webview → Host ─────────────────────────────────────────────────────────
@@ -207,11 +226,26 @@ export interface OpenWikiLinkMessage {
   readonly heading: string | null;
 }
 
+// The webview asks the host to preview a wiki-link's target for the hover card
+// (T-4.2). Posted after a short dwell when the pointer rests on a rendered
+// `a.markstudio-wikilink`. `target` is the note name as written (before `#` and
+// `|`); `heading` is the `#` anchor or `null`. The host resolves `target`
+// through the shared `LinkIndexService` (open-first on ambiguity, identical to
+// `openWikiLink`), reads a capped excerpt, and replies with a
+// `linkPreviewContent`. Both fields are untrusted strings validated at the bus
+// boundary before the host acts.
+export interface RequestLinkPreviewMessage {
+  readonly type: "requestLinkPreview";
+  readonly target: string;
+  readonly heading: string | null;
+}
+
 export type WebviewToHostMessage =
   | ReadyMessage
   | EditMessage
   | LayoutModeChangedMessage
   | OpenWikiLinkMessage
+  | RequestLinkPreviewMessage
   | ErrorMessage;
 
 // ─── Boundary guards ────────────────────────────────────────────────────────
@@ -291,6 +325,14 @@ export function isHostToWebviewMessage(
       return isMarkStudioConfig(value.config);
     case "revealLine":
       return typeof value.line === "number";
+    case "linkPreviewContent":
+      return (
+        typeof value.target === "string" &&
+        (value.heading === null || typeof value.heading === "string") &&
+        (value.status === "ok" || value.status === "missing") &&
+        (value.text === undefined || typeof value.text === "string") &&
+        (value.title === undefined || typeof value.title === "string")
+      );
     case "error":
       return typeof value.message === "string";
     default:
@@ -319,6 +361,7 @@ export function isWebviewToHostMessage(
         (LAYOUT_MODES as ReadonlyArray<string>).includes(value.mode)
       );
     case "openWikiLink":
+    case "requestLinkPreview":
       return (
         typeof value.target === "string" &&
         (value.heading === null || typeof value.heading === "string")
