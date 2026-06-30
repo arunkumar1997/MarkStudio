@@ -89,6 +89,7 @@ Begin the PKM layer — only after the core is unshakeable.
 
 **Milestones**
 * M4.1 — Backlinks panel *(Done — T-4.1; native `MarkStudio Backlinks` tree view over a host-side, async, watcher-backed link index; lands the wiki-link resolver deferred from Phase 3, ADR-0020)*
+  * T-4.1b — In-preview wiki-link navigation *(Done; clicking `[[note]]` in the preview opens the target via the shared M4.1 resolver, ADR-0021)*
 * M4.2 — Hover preview for links
 * M4.3 — Embedded notes / transclusion
 * M4.4 — Graph view

@@ -115,6 +115,24 @@ export function buildHeadingTree(
   return roots;
 }
 
+// Find the 0-based line of the heading whose text matches `heading`, for
+// in-preview wiki-link navigation to `[[note#heading]]` (T-4.1b). Matching is
+// case-insensitive on the trimmed heading text (the same text `parseHeadings`
+// surfaces, inline Markdown left as-is). Returns the first match's line, or -1
+// when no heading matches (the caller then falls back to the top of the file).
+export function findHeadingLine(text: string, heading: string): number {
+  const wanted = heading.trim().toLowerCase();
+  if (wanted.length === 0) {
+    return -1;
+  }
+  for (const found of parseHeadings(text)) {
+    if (found.text.trim().toLowerCase() === wanted) {
+      return found.line;
+    }
+  }
+  return -1;
+}
+
 // A leading YAML front-matter block (`---` on the very first line, closed by a
 // later `---`) is metadata, not content. Return the index of the first line
 // after it, or 0 when there is no front matter.

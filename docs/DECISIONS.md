@@ -28,6 +28,7 @@ The foundational ADRs below (0001–0006) encode the non-negotiable rules from [
 | [0018](#adr-0018-wiki-links-as-a-dependency-free-markdown-it-inline-rule) | Wiki links as a dependency-free markdown-it inline rule | Accepted |
 | [0019](#adr-0019-footnotes--gfm-completeness-plugin-for-footnotes-built-ins--an-in-tree-rule-for-the-rest) | Footnotes & GFM completeness: plugin for footnotes, built-ins + an in-tree rule for the rest | Accepted |
 | [0020](#adr-0020-host-side-link-index-with-a-case-insensitive-basename-resolver-behind-a-filesystemwatcher) | Host-side link index with a case-insensitive basename resolver behind a `FileSystemWatcher` | Accepted |
+| [0021](#adr-0021-in-preview-wiki-link-navigation-via-a-shared-host-side-resolver-and-an-openwikilink-message) | In-preview wiki-link navigation via a shared host-side resolver and an `openWikiLink` message | Accepted |
 
 ---
 
@@ -975,3 +976,63 @@ Not a migration. New files under `src/links/`; `src/extension.ts` calls `registe
 * [design/backlinks.md](design/backlinks.md)
 * [ROADMAP.md](ROADMAP.md) — Phase 4 M4.1
 * [TODO.md](TODO.md) — T-4.1
+
+---
+
+## ADR-0021: In-preview wiki-link navigation via a shared host-side resolver and an `openWikiLink` message
+
+### Status
+`Accepted`
+
+### Date
+2026-06-28
+
+### Context
+**T-4.1b** (Phase 4) makes the wiki-links the preview already renders (T-3.4) **clickable**: clicking `[[note]]` in the preview pane opens the target note in an editor — the in-document counterpart to the M4.1 Backlinks panel's "what links here." The resolver that maps a `[[target]]` to a workspace file already exists from M4.1 (ADR-0020), but it lived **inside** the Backlinks feature (`LinkIndexService`/`linkIndex`), reachable only by the tree provider. Three questions had to be settled: (1) **where resolution runs** — in the webview or the host; (2) **how the click reaches it** — given ADR-0002 forbids recreating the webview and ADR-0001/0009 keep document I/O on the host; and (3) **whether to add a second resolver or share the M4.1 one**.
+
+A wiki-link target resolves against the **workspace** (every `.md` file, including notes no editor has open) and opens a **note as an editor** — both are host responsibilities under ADR-0001/0004. The webview has neither the file index nor the `vscode` API to open an editor, so it cannot resolve or navigate on its own. What it *does* own is the click: the rendered anchor lives in the persistent preview DOM.
+
+### Decision
+1. **The webview detects the click and delegates; the host resolves and navigates.** A single delegated listener (`registerWikiLinkClicks`) on the persistent preview pane (`shell.previewPane`, never replaced per ADR-0002) uses `Element.closest('a.markstudio-wikilink')`, reads the anchor's `data-wikilink-target` / `data-wikilink-heading`, calls `preventDefault()`, and posts a new **`openWikiLink { target, heading }`** webview → host message (the first webview-originated navigation message). One listener for the whole pane survives every incremental preview patch.
+2. **One resolver, shared.** Rather than add a second resolver in the webview or duplicate ADR-0020's logic, the existing index is exposed through a new `LinkIndex.resolveForward(fromPath, target)` (a thin public wrapper over the private `resolveTarget` the backlink build already used) and a `LinkIndexService.resolveTarget(fromUri, target): vscode.Uri[]` URI wrapper. The Backlinks panel and click-navigation now resolve through the **same** code path — the unification ADR-0020's follow-up called for. Forward resolution deliberately **keeps** a self-match (clicking `[[A]]` inside note A opens A), whereas the backlink build still drops self-links; the one shared resolver returns all matches and each caller applies its own self-policy.
+3. **A single `LinkIndexService` is hoisted to `extension.ts`** and injected into both `registerBacklinks(provider, service)` and the editor provider, so the panel and click-navigation share one workspace scan and one live index rather than each owning a service.
+4. **Host navigation policy (Producer decisions), reusing ADR-0020's rules:** resolve `target` relative to the **active** document; case-insensitive basename with path-qualified relative-first; **ambiguous basename → open the first match** (no quick-pick this sprint); **existing notes only** (no click-to-create); unresolved → a transient `window.setStatusBarMessage(…, 4000)` rather than a modal. When a `#heading` is present, a pure `findHeadingLine(text, heading)` (added to the outline scanner, `src/outline/headings.ts`) finds the line by case-insensitive trimmed exact match and the host reveals it; misses fall back to the top of the file. Same-document heading-only links (`[[#heading]]`, empty `target`) are inert this sprint.
+5. **No new setting.** The feature is gated by the existing `markstudio.preview.wikiLinks` toggle that already controls whether wiki-links render at all — a non-rendered link cannot be clicked.
+
+### Alternatives Considered
+1. **Resolve in the webview and post a ready-made path to open** — Rejected: the webview has no workspace file index and no `vscode` API; it would need a second copy of the index shipped across the protocol and kept in sync. Resolution belongs on the host (ADR-0001/0004).
+2. **Reuse an existing message (e.g. overload `revealLine`)** — Rejected: `revealLine` is a host → webview, same-document scroll; cross-document open is a distinct, webview-originated intent and deserves its own typed, guarded message (CODING_GUIDELINES §9).
+3. **A second, webview-local resolver** — Rejected: it would duplicate ADR-0020's basename/relative-first/ambiguity rules and inevitably drift. Sharing one resolver is the whole point of having kept `linkIndex` pure.
+4. **A quick-pick on ambiguous basenames** — Deferred: open-first is the lower-friction default and matches the panel's "link all matches" tolerance; a disambiguation picker is a tracked follow-up.
+5. **Click-to-create for unresolved targets** — Deferred: note creation is its own feature (templates, location, front-matter) and out of scope for a navigation sprint; a status-bar message is the v1 affordance.
+6. **Slug-based heading matching** — Deferred: `findHeadingLine` does an exact trimmed match on raw heading source, so it won't match headings containing inline Markdown (`## **Bold**`). Acceptable v1; a shared slugify is the follow-up.
+
+### Reasoning
+The split — webview delegates the click, host resolves and opens — keeps every responsibility where the architecture already puts it: the persistent preview owns its DOM and a single delegated listener (no per-patch rebinding), while resolution and editor navigation stay on the host through supported APIs. Adding one typed, guarded `openWikiLink` message rather than overloading an existing one keeps the protocol honest. Exposing `resolveForward` instead of forking the resolver makes the Backlinks panel and click-navigation provably consistent and is the unification ADR-0020 anticipated. Hoisting one `LinkIndexService` avoids a second workspace scan. Reusing ADR-0020's resolution policy verbatim means clicking a link and reading its backlink resolve identically.
+
+### Consequences
+**Positive:** Wiki-links are now navigable in the preview, closing the loop with the Backlinks panel through **one** shared resolver and **one** workspace index. The new message is small and guarded; the persistent preview and CodeMirror are untouched (no recreation). Heading navigation works for plain headings. Host bundle grows from **~40.4 KB to ~44.0 KB**; the webview seam is unchanged.
+**Negative / Trade-offs:** Ambiguous basenames open the first match silently; unresolved targets only surface in the status bar; same-document `[[#heading]]` links and inline-Markdown headings don't navigate yet. All are deferred, not blocking.
+**Neutral:** New `OpenWikiLinkMessage` in the protocol; new `src/webview/preview/wikiLinkClick.ts`; `registerBacklinks` signature changes to take an injected service; `findHeadingLine` added to `src/outline/headings.ts`. No new dependency, no new setting, no new command.
+
+### Compliance Impact
+No rule bent. Upholds ADR-0001 (the host opens notes via `showTextDocument`), ADR-0002 (the webview is never recreated; one delegated listener on the persistent pane; navigation is a `postMessage`, not a reload), ADR-0004 (reuses the M4.1 index/watcher; native editor navigation), ADR-0005 (vanilla host + webview code, one new pure helper), and ADR-0018/0020 (same wiki-link syntax and resolver). It realises ADR-0020's "in-preview wiki-link navigation reuses this resolver" follow-up.
+
+### Migration Plan
+Not a migration. `extension.ts` now creates the single `LinkIndexService`, calls `start()`, and injects it into `register()` and `registerBacklinks()`; the webview mounts `registerWikiLinkClicks(previewPane, bus)` after scroll-sync. No existing behaviour changes beyond wiki-links becoming clickable; no setting or command added.
+
+### Follow-Ups
+* Quick-pick disambiguation for ambiguous basenames.
+* Click-to-create for unresolved targets.
+* Slug-based heading matching (shared with the outline) so inline-Markdown headings navigate.
+* Same-document `[[#heading]]` navigation (scroll within the active note).
+
+### References
+* [ADR-0001](#adr-0001-use-the-custom-editor-api)
+* [ADR-0002](#adr-0002-one-persistent-webview-retained-when-hidden)
+* [ADR-0018](#adr-0018-wiki-links-as-a-dependency-free-markdown-it-inline-rule)
+* [ADR-0020](#adr-0020-host-side-link-index-with-a-case-insensitive-basename-resolver-behind-a-filesystemwatcher)
+* [design/wiki-navigation.md](design/wiki-navigation.md)
+* [api/message-protocol.md](api/message-protocol.md) — `openWikiLink`
+* [ROADMAP.md](ROADMAP.md) — Phase 4
+* [TODO.md](TODO.md) — T-4.1b

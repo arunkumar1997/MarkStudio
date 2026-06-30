@@ -11,6 +11,7 @@ import assert from "node:assert/strict";
 
 import {
   buildHeadingTree,
+  findHeadingLine,
   parseHeadings,
   type Heading
 } from "../../src/outline/headings";
@@ -160,5 +161,45 @@ describe("buildHeadingTree", () => {
     assert.equal(tree.length, 2);
     assert.equal(tree[0].children.length, 0);
     assert.equal(tree[1].heading.level, 1);
+  });
+});
+
+describe("findHeadingLine (T-4.1b navigation)", () => {
+  const doc = [
+    "# Title",
+    "",
+    "Intro paragraph.",
+    "",
+    "## Getting Started",
+    "",
+    "Body.",
+    "",
+    "## Reference"
+  ].join("\n");
+
+  it("returns the 0-based line of a matching heading", () => {
+    assert.equal(findHeadingLine(doc, "Getting Started"), 4);
+  });
+
+  it("matches case-insensitively and trims the query", () => {
+    assert.equal(findHeadingLine(doc, "  getting started  "), 4);
+  });
+
+  it("returns the first match's line for the top heading", () => {
+    assert.equal(findHeadingLine(doc, "Title"), 0);
+  });
+
+  it("returns -1 when no heading matches", () => {
+    assert.equal(findHeadingLine(doc, "Nonexistent"), -1);
+  });
+
+  it("returns -1 for an empty query", () => {
+    assert.equal(findHeadingLine(doc, "   "), -1);
+  });
+
+  it("ignores a heading-like line inside a fenced code block", () => {
+    const text = ["# Real", "", "```", "## Fake", "```"].join("\n");
+    assert.equal(findHeadingLine(text, "Fake"), -1);
+    assert.equal(findHeadingLine(text, "Real"), 0);
   });
 });

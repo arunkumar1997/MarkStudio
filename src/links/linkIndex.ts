@@ -48,9 +48,13 @@ export interface Backlink {
 }
 
 // The built reverse index. `backlinksFor(path)` returns every note that links
-// to the note at `path`, sorted for stable display.
+// to the note at `path`, sorted for stable display. `resolveForward(fromPath,
+// target)` is the same resolver the index builds backlinks with, exposed for
+// in-preview wiki-link navigation (T-4.1b) so the panel and click-navigation
+// share one resolution implementation (no parallel logic).
 export interface LinkIndex {
   backlinksFor(path: string): Backlink[];
+  resolveForward(fromPath: string, target: string): string[];
 }
 
 const MD_EXTENSION = /\.(md|markdown)$/i;
@@ -111,6 +115,19 @@ export function buildLinkIndex(notes: ReadonlyArray<ParsedNote>): LinkIndex {
     backlinksFor(path: string): Backlink[] {
       const bucket = reverse.get(path.toLowerCase());
       return bucket ? dedupeAndSort(bucket) : [];
+    },
+    // Forward resolution for in-preview navigation (T-4.1b): the note path(s)
+    // a `target` written in `fromPath` points at. Unlike the backlink build
+    // loop this does **not** drop a self-match — clicking `[[A]]` inside A
+    // should still resolve to A. Ambiguous basenames return all matches in
+    // index order; the caller opens the first.
+    resolveForward(fromPath: string, target: string): string[] {
+      return resolveTarget(
+        fromPath,
+        target,
+        canonicalByLowerPath,
+        pathsByBasename
+      );
     }
   };
 }

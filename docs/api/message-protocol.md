@@ -1,6 +1,6 @@
 # Message Protocol
 
-> The typed contract exchanged between the MarkStudio extension host and the webview, as of **T-2.2**. The code is the source of truth — see [`src/messaging/messages.ts`](../../src/messaging/messages.ts), [`src/messaging/HostMessageBus.ts`](../../src/messaging/HostMessageBus.ts), and [`src/messaging/WebviewMessageBus.ts`](../../src/messaging/WebviewMessageBus.ts). Update this doc in the **same change** as the code.
+> The typed contract exchanged between the MarkStudio extension host and the webview, as of **T-4.1b**. The code is the source of truth — see [`src/messaging/messages.ts`](../../src/messaging/messages.ts), [`src/messaging/HostMessageBus.ts`](../../src/messaging/HostMessageBus.ts), and [`src/messaging/WebviewMessageBus.ts`](../../src/messaging/WebviewMessageBus.ts). Update this doc in the **same change** as the code.
 
 ---
 
@@ -29,7 +29,7 @@
 
 The host suppresses `setContent` echoes of its own webview-originated edits via a text-equality guard, so the webview never receives a copy of an edit it just sent.
 
-> **No protocol change in T-4.1 (Backlinks panel, M4.1).** Like the document outline (T-2.2), the backlinks panel is entirely host-side — a `vscode.TreeDataProvider` over a workspace link index — and navigates by opening the source note in a native text editor (`showTextDocument`), not via the webview. It adds **no** host ⇄ webview message. A future in-preview wiki-link navigation feature (T-4.1b) would add a webview → host message; this sprint does not.
+> **No protocol change in T-4.1 (Backlinks panel, M4.1).** Like the document outline (T-2.2), the backlinks panel is entirely host-side — a `vscode.TreeDataProvider` over a workspace link index — and navigates by opening the source note in a native text editor (`showTextDocument`), not via the webview. It adds **no** host ⇄ webview message. In-preview wiki-link navigation (T-4.1b) adds the `openWikiLink` webview → host message documented below.
 
 ## 3. Webview → Host
 
@@ -38,6 +38,7 @@ The host suppresses `setContent` echoes of its own webview-originated edits via 
 | `ready`             | `{}`                                                   | The webview has built its shell and is ready to receive `init`.                                 |
 | `edit`              | `{ changes: EditChange[], text: string }`              | The webview proposes a content change as a batch of minimal `EditChange { from, to, insert }` entries (the CodeMirror 6 diff). `from`/`to` are character offsets into the pre-change document text. `text` is the resulting full document text, used by the host's echo guard. Applied through `MarkStudioDocument.applyChanges` (`vscode.WorkspaceEdit`) so dirty state, undo/redo, save and revert integrate natively. |
 | `layoutModeChanged` | `{ mode: "split" \| "editor-only" \| "preview-only" }` | The App Shell layout mode changed (T-109). The host persists the new value via `StateStore` so it replays on the next `init`. Fired by user-driven changes only (toolbar, toggle / show commands, focus commands that auto-promote to split); host-initiated `setLayoutMode` / `togglePreview` / `toggleSplit` / `focusPane` messages also reach the same code path inside the webview, so the host effectively round-trips its own writes back into the Memento — idempotent because the same value is written. |
+| `openWikiLink`      | `{ target: string, heading: string \| null }`          | The user clicked a wiki-link (`[[target]]`, `[[target\|alias]]`, `[[target#heading]]`) inside the preview (T-4.1b). A single delegated listener on the preview pane reads the anchor's `data-wikilink-target` / `data-wikilink-heading` and posts this. The host resolves `target` relative to the active document via the shared `LinkIndexService` (case-insensitive basename; path-qualified relative-first; ambiguous → open the first match), opens the note with `showTextDocument`, and reveals the `heading` line when present (falling back to the top of the file). An unresolved target shows a transient status-bar message. Same-document heading links (`[[#heading]]`, empty `target`) are inert this sprint. |
 | `error`             | `{ message: string }`                                  | A webview-side diagnostic the host should surface or log.                                       |
 
 ---

@@ -198,3 +198,58 @@ describe("buildLinkIndex — ordering", () => {
     );
   });
 });
+
+describe("buildLinkIndex — resolveForward (T-4.1b navigation)", () => {
+  // The index over a small vault; the notes carry no links because forward
+  // resolution only needs the set of note paths, not their contents.
+  const index = buildLinkIndex([
+    note("A.md", []),
+    note("B.md", []),
+    note("docs/Guide.md", []),
+    note("api/Guide.md", [])
+  ]);
+
+  it("resolves a bare basename to the matching note", () => {
+    assert.deepEqual(index.resolveForward("A.md", "B"), ["B.md"]);
+  });
+
+  it("is case-insensitive on the target", () => {
+    assert.deepEqual(index.resolveForward("A.md", "b"), ["B.md"]);
+  });
+
+  it("accepts a target written with the .md extension", () => {
+    assert.deepEqual(index.resolveForward("A.md", "B.md"), ["B.md"]);
+  });
+
+  it("resolves a self-link to the source note (navigation keeps self)", () => {
+    assert.deepEqual(index.resolveForward("A.md", "A"), ["A.md"]);
+  });
+
+  it("returns all matches for an ambiguous basename, in index order", () => {
+    assert.deepEqual(index.resolveForward("A.md", "Guide"), [
+      "docs/Guide.md",
+      "api/Guide.md"
+    ]);
+  });
+
+  it("resolves a path-qualified target relative to the source note first", () => {
+    // From docs/Guide.md, `[[../api/Guide]]` should hit api/Guide.md, not the
+    // sibling docs/Guide.md that shares the basename.
+    assert.deepEqual(index.resolveForward("docs/Guide.md", "../api/Guide"), [
+      "api/Guide.md"
+    ]);
+  });
+
+  it("falls back to basename when a path-qualified target misses", () => {
+    // `nope/B` has no relative match, so it falls back to the B.md basename.
+    assert.deepEqual(index.resolveForward("A.md", "nope/B"), ["B.md"]);
+  });
+
+  it("returns an empty array for an unresolved target", () => {
+    assert.deepEqual(index.resolveForward("A.md", "DoesNotExist"), []);
+  });
+
+  it("returns an empty array for an empty target", () => {
+    assert.deepEqual(index.resolveForward("A.md", "   "), []);
+  });
+});

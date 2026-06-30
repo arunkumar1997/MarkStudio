@@ -2,9 +2,11 @@ import * as vscode from "vscode";
 import { HostMessageBus } from "../messaging/HostMessageBus";
 import { MarkStudioDocument } from "./MarkStudioDocument";
 import { buildWebviewHtml } from "./webviewHtml";
+import { findHeadingLine } from "../outline/headings";
 import type { FocusablePane, LayoutMode } from "../messaging/messages";
 import type { StateStore } from "../services/StateStore";
 import type { ConfigurationService } from "../services/ConfigurationService";
+import type { LinkIndexService } from "../links/LinkIndexService";
 
 // One per resolved MarkStudio editor. Owns the typed `HostMessageBus` for
 // that webview and exposes the operations commands need (layout-mode switch
@@ -57,7 +59,8 @@ export class MarkStudioEditorProvider
   public static register(
     context: vscode.ExtensionContext,
     stateStore: StateStore,
-    configService: ConfigurationService
+    configService: ConfigurationService,
+    linkIndexService: LinkIndexService
   ): {
     readonly provider: MarkStudioEditorProvider;
     readonly disposable: vscode.Disposable;
@@ -65,7 +68,8 @@ export class MarkStudioEditorProvider
     const provider = new MarkStudioEditorProvider(
       context,
       stateStore,
-      configService
+      configService,
+      linkIndexService
     );
     const registration = vscode.window.registerCustomEditorProvider(
       MarkStudioEditorProvider.viewType,
@@ -97,7 +101,8 @@ export class MarkStudioEditorProvider
   private constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly stateStore: StateStore,
-    private readonly configService: ConfigurationService
+    private readonly configService: ConfigurationService,
+    private readonly linkIndexService: LinkIndexService
   ) {}
 
   public getActiveController(): MarkStudioEditorController | null {
@@ -114,6 +119,68 @@ export class MarkStudioEditorProvider
     }
     this.activeDocument = document;
     this.activeDocumentEmitter.fire(document);
+  }
+
+  // Resolve a wiki-link clicked in the preview (T-4.1b) and open the target
+  // note. `target` is resolved relative to the clicked note (`fromUri`) through
+  // the shared `LinkIndexService` — the same resolver the Backlinks panel uses,
+  // so navigation and backlinks agree. When a `heading` is given, the heading's
+  // line is revealed (falling back to the top of the file if it is not found);
+  // otherwise the file opens at line 0. An ambiguous basename opens the first
+  // match; an unresolved target shows a transient status-bar message. If the
+  // resolved target fails to open (e.g. it was deleted inside the watcher
+  // debounce window, so the index still lists it), the same transient
+  // status-bar fallback is shown. This method never throws — the caller invokes
+  // it fire-and-forget via `void`. The note opens in the built-in text editor
+  // (the custom editor is registered at `priority: "option"`, so
+  // `showTextDocument` does not hijack it) — the reliable way to reveal a
+  // specific line.
+  private async openWikiLink(
+    fromUri: vscode.Uri,
+    target: string,
+    heading: string | null
+  ): Promise<void> {
+    const matches = this.linkIndexService.resolveTarget(fromUri, target);
+    if (matches.length === 0) {
+      void vscode.window.setStatusBarMessage(
+        `MarkStudio: no note found for [[${target}]]`,
+        4000
+      );
+      return;
+    }
+
+    const targetUri = matches[0];
+
+    try {
+      const targetDocument = await vscode.workspace.openTextDocument(targetUri);
+
+      let line = 0;
+      if (heading !== null && heading.length > 0) {
+        const headingLine = findHeadingLine(targetDocument.getText(), heading);
+        if (headingLine >= 0) {
+          line = headingLine;
+        }
+      }
+
+      const safeLine = Math.max(
+        0,
+        Math.min(line, targetDocument.lineCount - 1)
+      );
+      const position = new vscode.Position(safeLine, 0);
+      await vscode.window.showTextDocument(targetDocument, {
+        selection: new vscode.Range(position, position)
+      });
+    } catch {
+      // The index resolved a match, but opening it failed — e.g. the file was
+      // deleted inside the FileSystemWatcher debounce window, so the in-memory
+      // index still lists it. Degrade like the unresolved path: a transient
+      // status-bar message, never a throw (the caller invokes this fire-and-
+      // forget via `void`).
+      void vscode.window.setStatusBarMessage(
+        `MarkStudio: could not open note for [[${target}]]`,
+        4000
+      );
+    }
   }
 
   public resolveCustomTextEditor(
@@ -162,6 +229,13 @@ export class MarkStudioEditorProvider
             return;
           case "layoutModeChanged":
             void this.stateStore.setLayoutMode(document.uri, message.mode);
+            return;
+          case "openWikiLink":
+            void this.openWikiLink(
+              document.uri,
+              message.target,
+              message.heading
+            );
             return;
           case "error":
             console.error(`[markstudio] webview error: ${message.message}`);

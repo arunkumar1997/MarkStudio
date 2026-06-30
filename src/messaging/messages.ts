@@ -194,10 +194,24 @@ export interface LayoutModeChangedMessage {
   readonly mode: LayoutMode;
 }
 
+// The webview reports that the user clicked a wiki-link (`[[target]]`,
+// `[[target|alias]]`, `[[target#heading]]`) inside the preview (T-4.1b). The
+// host resolves `target` relative to the active document via the shared
+// `LinkIndexService` and opens the note — at the `heading` line when present,
+// else the top of the file. `target` is the note name as written (before `#`
+// and `|`); `heading` is the `#` anchor or `null`. Both are untrusted strings
+// validated at the bus boundary before the host acts.
+export interface OpenWikiLinkMessage {
+  readonly type: "openWikiLink";
+  readonly target: string;
+  readonly heading: string | null;
+}
+
 export type WebviewToHostMessage =
   | ReadyMessage
   | EditMessage
   | LayoutModeChangedMessage
+  | OpenWikiLinkMessage
   | ErrorMessage;
 
 // ─── Boundary guards ────────────────────────────────────────────────────────
@@ -303,6 +317,11 @@ export function isWebviewToHostMessage(
       return (
         typeof value.mode === "string" &&
         (LAYOUT_MODES as ReadonlyArray<string>).includes(value.mode)
+      );
+    case "openWikiLink":
+      return (
+        typeof value.target === "string" &&
+        (value.heading === null || typeof value.heading === "string")
       );
     case "error":
       return typeof value.message === "string";
