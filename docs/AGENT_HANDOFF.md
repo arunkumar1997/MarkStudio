@@ -1,4 +1,4 @@
-# AGENT HANDOFF — Bugfix: wiki-link / Backlinks open in MarkStudio (2026-06-30)
+# AGENT HANDOFF — PR #4 merged: wiki-link / Backlinks / standard markdown links open in MarkStudio (2026-06-30)
 
 > Overwrite this file at the end of every working session; do not append. The previous handoff is preserved in git history. Template: [.ai/TEMPLATES/HANDOFF.md](../.ai/TEMPLATES/HANDOFF.md).
 >
@@ -9,40 +9,49 @@
 ## Session Metadata
 
 * **Date:** 2026-06-30
-* **Agent / Author:** Dev Team (Sage — host + messaging)
-* **Working branch:** `fix/wikilink-open-in-markstudio` (off `main` `8bf1a86`)
-* **Last commit on `main`:** `8bf1a86` *(`--no-ff` merge of `feature/sprint-4` / PR #3 — M4.2)*
-* **Branch state:** Fix implemented and **uncommitted** in the working tree — left for the Producer to review, commit, and merge. Local gate green (180 unit + 52 integration + 6 exthost).
-* **Prompt used:** ai-team-dev (bugfix)
+* **Agent / Author:** Remy (Producer) — merge + post-merge docs sync
+* **Working branch:** `main` (merged from `fix/wikilink-open-in-markstudio`)
+* **Last commit on `main`:** `dee909e` *(`--no-ff` merge of `fix/wikilink-open-in-markstudio` / PR #4)*
+* **Branch state:** PR #4 merged to `main` via `--no-ff` (repo convention; never squash/rebase). The four feature commits on the branch are preserved in history: `dc8cda2` fix (wiki-link + backlinks) + `0b11632` docs + `d11e2ac` fix (standard markdown links) + `807105a` docs.
+* **Prompt used:** ai-team-orchestration (Producer close-out)
 
 ---
 
 ## 1. What Was Completed
 
-Fixed the defect where clicking a wiki-link (`[[note]]` / `[[note#heading]]`) in the preview — and clicking a row in the **Backlinks** panel — opened the target `.md` in VS Code's **built-in text editor** (raw Markdown) instead of the **MarkStudio** custom editor. Root cause: both call sites used `vscode.window.showTextDocument(...)`, which does not route to a custom editor registered at `priority: "option"` (this was the deliberate prior ADR-0021 / ADR-0020 choice).
+**Bugfix merged: clicking a `.md` target from the preview or the Backlinks panel now opens MarkStudio, not VS Code's built-in text editor.** Root cause was that `vscode.window.showTextDocument(...)` does not route to a custom editor registered at `priority: "option"` (the deliberate ADR-0021 / ADR-0020 choice). The fix is a small **pending-reveal handshake** built around `vscode.commands.executeCommand("vscode.openWith", uri, MarkStudioEditorProvider.viewType)`, applied uniformly to **three** navigation paths:
 
-Both call sites now open the target in MarkStudio via `vscode.commands.executeCommand("vscode.openWith", targetUri, MarkStudioEditorProvider.viewType)` (mirroring the existing `markstudio.openMarkStudio` command), and reveal the target line through the existing host → webview **`revealLine`** message using a **pending-reveal handshake**.
+1. **Wiki-link clicks in the preview** — `[[note]]` / `[[note|alias]]` / `[[note#heading]]` (T-4.1b path).
+2. **Backlinks panel rows** — `markstudio.backlinks.open` (T-4.1 path).
+3. **Standard markdown links in the preview** (new in this PR's second commit pair) — `[Architecture Overview](./ARCHITECTURE.md)`, `[doc](/docs/x.md)`, with or without a `#heading` fragment.
 
-* **`src/editor/pendingReveals.ts` (new, pure).** `PendingReveals` — a tiny `Map<string, number>` wrapper (`set` / `take` / `clear`) keyed by `uri.toString()`, parking the requested 0-based reveal line for a target that is not yet open. No `vscode`/DOM imports → unit-testable.
-* **`src/editor/MarkStudioEditorProvider.ts` (edited).** Added `controllersByUri: Map<string, MarkStudioEditorController>` (every resolved editor, keyed by URI; one per document since `supportsMultipleEditorsPerDocument: false`) alongside the existing single-`activeController` focus tracking, and a `PendingReveals` instance. New **public** `openInMarkStudio(targetUri, line)`: already-open target → `openWith` focuses its tab + `revealLine` immediately on the live controller; not-yet-open target → record the line in `pendingReveals` **before** `openWith`, applied by `applyPendingReveal(uri)` in the `ready` handler. `openWikiLink` now computes the heading line (`findHeadingLine`, miss → top), clamps, and delegates to `openInMarkStudio`; it keeps the try/catch → transient status-bar fallback. The controller is registered in `controllersByUri` at resolve and removed on dispose, where the pending entry is also cleared (so a reveal queued for an editor that closed before `ready` cannot leak onto a later editor).
-* **`src/links/registerBacklinks.ts` (edited).** The `markstudio.backlinks.open` handler's `openSourceAtLine` (which used `showTextDocument`) is replaced by `openSourceInMarkStudio(provider, uri, line)`: open the source doc to clamp the linking line, then `provider.openInMarkStudio(uri, safeLine)`. Wrapped in try/catch → transient status-bar fallback; stays fire-and-forget (`void`).
-* **Resolver unchanged.** Both paths still resolve through the shared `LinkIndexService.resolveTarget` (open-first on ambiguity), so hover, click, and backlinks continue to agree.
+**Architecture.**
 
-**Tests.** Unit 172 → **180** (`test/editor/pendingReveals.test.ts` — set/take one-shot, line-0 preserved, independent URIs, most-recent-wins, clear). Integration **52** (unchanged). Exthost 4 → **6** (`test/exthost/suite/navigation.test.ts` — the Backlinks open command lands a `TabInputCustom` with `viewType === "markstudio.editor"`, both fresh-open and already-open cases; registered in `test/exthost/index.ts`).
+* **`src/editor/pendingReveals.ts` (new, pure).** Tiny `Map<string, number>` wrapper (`set` / `take` / `clear`) keyed by `uri.toString()` that parks a requested 0-based reveal line for a target that is not yet open. No `vscode`/DOM imports → unit-testable.
+* **`src/editor/MarkStudioEditorProvider.ts`.** New `controllersByUri: Map<string, MarkStudioEditorController>` alongside the existing single-`activeController` focus tracking, plus a `PendingReveals` instance. New **public** `openInMarkStudio(targetUri, line)` is the single shared entry point for all three call sites: already-open target → `openWith` focuses its tab + `revealLine` immediately on the live controller; not-yet-open target → record the line in `pendingReveals` **before** `openWith`, applied by `applyPendingReveal(uri)` in the `ready` handler. Disposal removes the entry from `controllersByUri` and clears any stale pending reveal.
+* **`src/links/registerBacklinks.ts`.** `markstudio.backlinks.open` now calls `provider.openInMarkStudio(uri, safeLine)` (try/catch → transient status-bar fallback, fire-and-forget).
+* **`src/webview/preview/markdownLinkClick.ts` (new).** A second delegated `click` listener on the persistent preview pane, mounted next to `registerWikiLinkClicks` and strictly disjoint from it (skips anchors carrying `data-wikilink-target`). Two pure helpers (`isExternalHref`, `parseLocalMarkdownHref`) classify the href; the listener claims a click only when it is non-empty, has no URL scheme (rejecting `http:`/`https:`/`mailto:`/`vscode:`/`command:`/`file:`…), is not a same-document `#fragment`, no modifier key is held (`ctrlKey`/`metaKey`/`shiftKey`/`altKey`), the click's default is not already prevented, and the path ends in `.md` / `.markdown` after stripping any `?query` and `#fragment`. Claimed clicks `preventDefault()` and post a new typed **`openMarkdownLink { href, target, heading }`** webview → host message.
+* **`src/messaging/messages.ts`.** Added `OpenMarkdownLinkMessage` to the `WebviewToHostMessage` union with a boundary guard case (`isWebviewToHostMessage`).
+* **`src/extension.ts`.** `activate()` now returns a tiny `MarkStudioExtensionApi { provider }` purely so the Extension Host tests can drive `provider.openMarkdownLink` directly.
+* **Host handler `MarkStudioEditorProvider.openMarkdownLink(fromUri, href, target, heading)`.** Defence-in-depth `EXTERNAL_HREF` regex check (rejects schemed hrefs even if the webview slips one through), resolves via `resolveMarkdownLinkUri` — **plain URI math, not the workspace link index** (which only knows wiki-link basenames): a `/`-prefixed `target` is workspace-absolute (resolved against the source note's workspace folder, falling back to the first folder for an out-of-workspace source — multi-root vaults always route to *the source's own root*); any other `target` is relative to the source's containing directory (`vscode.Uri.joinPath(fromUri, "..", target)`). Then reads the target doc, finds the heading via `findHeadingLine` (miss → top), clamps the line, and routes through `openInMarkStudio` so the pending-reveal handshake is identical to the wiki-link / backlinks paths. Try/catch → transient status-bar fallback (`MarkStudio: no note found at "<href>"` / `could not open note at "<href>"`, 4000 ms), never a throw.
 
-**Docs.** ADR-0021 amended (Status + a new "Amendment (2026-06-30)" section + index-table status); ADR-0020 Decision item 1 marked superseded; [api/message-protocol.md](api/message-protocol.md) `revealLine` / `openWikiLink` / the T-4.1 note updated; [CHANGELOG.md](CHANGELOG.md) (new Fixed entry); [FEATURES.md](FEATURES.md) (Backlinks + In-preview navigation rows); [PROJECT_STATUS.md](PROJECT_STATUS.md); this handoff. Code comments in `MarkStudioEditorProvider.ts` and `registerBacklinks.ts` that described the old text-editor behaviour were rewritten.
+**Resolver unchanged.** Wiki-link clicks and Backlinks still resolve through the shared `LinkIndexService.resolveTarget` (open-first on ambiguity); standard markdown links resolve via plain URI math (the path is given explicitly).
+
+**Tests.** Unit 172 → **199** (+27: `test/editor/pendingReveals.test.ts` 8; `test/webview/markdownLinkClick.test.ts` 19). Integration 52 → **65** (+13: `test/integration/markdownLinkClick.test.ts`). Exthost 4 → **9** (+5: `test/exthost/suite/navigation.test.ts` — backlinks-opens-MarkStudio, already-open-focuses-MarkStudio, relative-`.md` href, workspace-absolute-`/path` href, external-`https:` no-op). **273 automated tests, 0 failures.**
+
+**Docs.** ADR-0021 has two amendments (the wiki-link/backlinks reveal handshake, and the standard markdown-link extension); ADR-0020 Decision item 1 marked superseded; [api/message-protocol.md](api/message-protocol.md) documents `openMarkdownLink`; [CHANGELOG.md](CHANGELOG.md) has two new `Fixed` entries; [FEATURES.md](FEATURES.md) Backlinks + In-preview navigation rows refreshed; [PROJECT_STATUS.md](PROJECT_STATUS.md); this handoff.
 
 ---
 
 ## 2. Current Work In Progress
 
-* **Item:** None in-flight. The fix is complete and **uncommitted** on `fix/wikilink-open-in-markstudio`, awaiting Producer review + commit + merge (the Dev Team does not commit/push/merge).
+* **None.** PR #4 is merged. `main` is `dee909e`, ahead of `origin/main` by this merge + the post-merge docs sync until the Producer pushes (see §8).
 
 ---
 
 ## 3. Remaining Work for This Initiative
 
-Phase 4 continues. After this fix merges, the next roadmap milestone is **M4.3 — Embedded notes / transclusion**, then **M4.4 — Graph view**. Tracked follow-ups (in [TODO.md](TODO.md)): T-4.1a (Markdown-link backlinks), T-4.1c (heading-level backlinks), and the ADR-0021 follow-ups (quick-pick disambiguation, click-to-create, slug-based heading matching, same-document `[[#heading]]` navigation).
+Phase 4 continues. The next roadmap milestone is **M4.3 — Embedded notes / transclusion**, then **M4.4 — Graph view**. Tracked follow-ups (in [TODO.md](TODO.md)): T-4.1a (Markdown-link backlinks — *the index, not click-nav; click-nav is now done*), T-4.1c (heading-level backlinks), and the ADR-0021 follow-ups (quick-pick disambiguation, click-to-create, slug-based heading matching, same-document `[[#heading]]` navigation).
 
 ---
 
@@ -51,16 +60,23 @@ Phase 4 continues. After this fix merges, the next roadmap milestone is **M4.3 �
 | File | Change | Notes |
 | ---- | ------ | ----- |
 | `src/editor/pendingReveals.ts` | New | Pure `PendingReveals` registry (`set` / `take` / `clear`) for the reveal handshake |
-| `src/editor/MarkStudioEditorProvider.ts` | Edited | `controllersByUri` map + `PendingReveals`; public `openInMarkStudio`; `applyPendingReveal` on `ready`; `openWikiLink` delegates; comment rewrite |
-| `src/links/registerBacklinks.ts` | Edited | Open source in MarkStudio via `provider.openInMarkStudio`; comment rewrite |
+| `src/editor/MarkStudioEditorProvider.ts` | Edited | `controllersByUri` map + `PendingReveals`; public `openInMarkStudio`; `applyPendingReveal` on `ready`; `openWikiLink` and the new `openMarkdownLink` both delegate; `resolveMarkdownLinkUri` (multi-root aware) |
+| `src/links/registerBacklinks.ts` | Edited | Open source in MarkStudio via `provider.openInMarkStudio` |
+| `src/webview/preview/markdownLinkClick.ts` | New | Delegated click listener + pure `isExternalHref` / `parseLocalMarkdownHref` helpers; posts `openMarkdownLink` |
+| `src/webview/main.ts` | Edited | Mount `registerMarkdownLinkClicks(shell.previewPane, bus)` next to `registerWikiLinkClicks` |
+| `src/messaging/messages.ts` | Edited | New `OpenMarkdownLinkMessage` in the union + boundary-guard case |
+| `src/extension.ts` | Edited | `activate()` returns `MarkStudioExtensionApi { provider }` (for Extension Host tests) |
 | `test/editor/pendingReveals.test.ts` | New | 8 unit tests for `PendingReveals` |
-| `test/exthost/suite/navigation.test.ts` | New | 2 Extension Host tests (open lands a `TabInputCustom` for the MarkStudio view type) |
+| `test/webview/markdownLinkClick.test.ts` | New | Unit tests for `isExternalHref` + `parseLocalMarkdownHref` |
+| `test/integration/markdownLinkClick.test.ts` | New | jsdom delegated-click integration tests |
+| `test/exthost/suite/navigation.test.ts` | New (then extended) | 5 Extension Host tests — backlinks, already-open, relative `.md`, workspace-absolute `/path`, external `https:` no-op |
 | `test/exthost/index.ts` | Edited | Import the new navigation suite |
-| `docs/DECISIONS.md` | Edited | ADR-0021 amendment + status; ADR-0020 item 1 superseded note |
-| `docs/api/message-protocol.md` | Edited | `revealLine` / `openWikiLink` / T-4.1 note updated (no message added) |
-| `docs/CHANGELOG.md` | Edited | New Fixed entry |
+| `test/messaging/messages.test.ts` | Edited | `openMarkdownLink` boundary-guard tests |
+| `docs/DECISIONS.md` | Edited | ADR-0021 two amendments; ADR-0020 item 1 superseded note |
+| `docs/api/message-protocol.md` | Edited | `openMarkdownLink` + `revealLine` notes |
+| `docs/CHANGELOG.md` | Edited | Two new Fixed entries |
 | `docs/FEATURES.md` | Edited | Backlinks + In-preview navigation rows |
-| `docs/PROJECT_STATUS.md` | Edited | In-flight bugfix snapshot |
+| `docs/PROJECT_STATUS.md` | Edited | Merged-snapshot |
 | `docs/AGENT_HANDOFF.md` | Rewritten | This file |
 
 `dist/`, `dist-test/`, and `.vscode-test/` are build/download artifacts (git-ignored), not committed.
@@ -69,12 +85,14 @@ Phase 4 continues. After this fix merges, the next roadmap milestone is **M4.3 �
 
 ## 5. Decisions Made
 
-* **Open `.md` targets in MarkStudio (not the built-in text editor) for both click-navigation and backlinks**, via `vscode.openWith` with the MarkStudio view type — consistency with the project philosophy (MarkStudio is *the* Markdown experience).
-  * **Recorded as ADR?** Yes → **ADR-0021 amendment (2026-06-30)**; supersedes the prior "open in built-in text editor" detail in ADR-0021 and ADR-0020.
-* **Reveal via the existing `revealLine` message + a pending-reveal handshake**, not a new message: a MarkStudio editor is a webview, so the line cannot ride `showTextDocument`'s `selection`. Already-open → reveal in place; not-yet-open → park the line and apply on `ready`. No new message, setting, command, or dependency.
+* **Open `.md` targets in MarkStudio (not the built-in text editor) for click-navigation, backlinks, AND standard markdown links**, via `vscode.openWith` with the MarkStudio view type — consistency with the project philosophy (MarkStudio is *the* Markdown experience).
+  * **Recorded as ADR?** Yes → **ADR-0021 amendment (2026-06-30)** for wiki-links / backlinks; **ADR-0021 second amendment (2026-06-30)** for standard markdown links.
+* **Reveal via the existing `revealLine` message + a pending-reveal handshake**, not a new message: a MarkStudio editor is a webview, so the line cannot ride `showTextDocument`'s `selection`. Already-open → reveal in place; not-yet-open → park the line and apply on `ready`.
   * **Recorded as ADR?** Covered by the ADR-0021 amendment.
-* **One shared `openInMarkStudio(uri, line)` on the provider** backs both call sites, so they cannot drift.
+* **One shared `openInMarkStudio(uri, line)` on the provider** backs all three call sites, so they cannot drift.
   * **Recorded as ADR?** Covered by the ADR-0021 amendment.
+* **Standard markdown links resolve via plain URI math, *not* the workspace link index.** The link index is a wiki-link basename index (it does not know about `./foo.md` syntax); standard markdown links carry an explicit relative or workspace-absolute path that `vscode.Uri.joinPath` resolves directly. Multi-root: a `/`-prefixed target is workspace-absolute against *the source note's* workspace folder.
+  * **Recorded as ADR?** Yes → **ADR-0021 second amendment (2026-06-30)**.
 
 ---
 
@@ -83,12 +101,13 @@ Phase 4 continues. After this fix merges, the next roadmap milestone is **M4.3 �
 * **Messages are processed in order in the webview**, so a `revealLine` sent right after `init` (on `ready`) is applied after the editor is built — matching how the outline tree's `revealLine` already works against a built editor.
 * **`vscode.openWith` on an already-open document focuses the existing custom editor** (no duplicate, since `supportsMultipleEditorsPerDocument: false`).
 * **The heading line is computed from the freshly opened target document's text** (`findHeadingLine`, raw-source exact match — the same v1 limitation as before; slug matching is the tracked follow-up).
+* **A workspace-absolute (`/path`) markdown link is interpreted relative to the *source note's* workspace folder**, falling back to the first workspace folder when the source is outside the workspace.
 
 ---
 
 ## 7. Technical Debt Introduced
 
-* **None new.** The fix removes a behavioural wart without adding scope. Carried-over debt is unchanged from the prior handoff (raw-source `findHeadingLine`, open-first on ambiguous basenames, status-bar-only unresolved targets, inert same-document `[[#heading]]`, wiki-links-only backlinks, file-level `#heading` grouping, multi-root path-key collisions, Mermaid live re-theme, always-bundled KaTeX, console-only failure logging, active-webview-only commands/indicator, keyboard-only find panel, accumulating `StateStore` Memento entries, linear scroll-sync interpolation, raw-source outline text, read-only task-list checkboxes).
+* **None new.** The fix removes a behavioural wart without adding scope. Carried-over debt is unchanged from the prior handoff (raw-source `findHeadingLine`, open-first on ambiguous basenames, status-bar-only unresolved targets, inert same-document `[[#heading]]`, wiki-links-only backlinks index, file-level `#heading` grouping, multi-root path-key collisions, Mermaid live re-theme, always-bundled KaTeX, console-only failure logging, active-webview-only commands/indicator, keyboard-only find panel, accumulating `StateStore` Memento entries, linear scroll-sync interpolation, raw-source outline text, read-only task-list checkboxes).
 
 None of these reverse the architecture; they are scoped placeholders with named successors.
 
@@ -96,8 +115,8 @@ None of these reverse the architecture; they are scoped placeholders with named 
 
 ## 8. Blockers
 
-* **None.** The fix is implemented and the local gate is green.
-* **Merge gate:** ⏳ open — pending Producer review + commit + `--no-ff` merge (and any QA F5 pass the Producer requires).
+* **None.** The fix is merged on `main` (`dee909e`); local gate is green.
+* **Push gate:** the Producer still needs to `git push origin main` so `origin/main` catches up to the local merge commit + the post-merge docs sync.
 
 ---
 
@@ -106,17 +125,17 @@ None of these reverse the architecture; they are scoped placeholders with named 
 * [x] `npm run lint` — ESLint clean (`--max-warnings 0`) + `prettier --check .` clean
 * [x] `npm run typecheck` (strict, `src`) passes
 * [x] `npm run typecheck:test` (strict, `src` + `test`) passes
-* [x] `npm run build` passes — host bundle `dist/extension.js` **~51.5 KB**
-* [x] `npm test` passes — **232 tests** (180 unit + 52 integration, `node:test`)
-* [x] `npm run test:exthost` passes — **6** Extension Host tests (a harmless "Error mutex already exists" log prints; exit code 0)
-* [ ] **Manual verification in an Extension Development Host (F5)** — **pending QA/Producer** (human-only): click `[[note]]` / `[[note#heading]]` in the preview opens the target in MarkStudio at the right line; click a Backlinks row opens the source in MarkStudio at the linking line; already-open target focuses + reveals (no duplicate tab); unresolved target / failed open shows the transient status-bar message.
+* [x] `npm run build` passes — host bundle `dist/extension.js` **~55.2 KB**
+* [x] `npm test` passes — **264 tests** (199 unit + 65 integration, `node:test`)
+* [x] `npm run test:exthost` passes — **9** Extension Host tests (a harmless "Error mutex already exists" log prints; exit code 0)
+* [x] **Manual verification in an Extension Development Host (F5)** — user-confirmed "all good" before merge (wiki-link click, backlinks row, standard markdown link, `#heading` reveal, already-open focus, external link untouched, modifier-key passthrough).
 * [x] Webview is not recreated (reveal is a `postMessage`); CodeMirror state preserved.
 
 ---
 
 ## 10. Recommended Next Task
 
-* **Task:** Once the Producer merges this fix, continue Phase 4 with **M4.3 — Embedded notes / transclusion**, reusing the shared `src/links/` resolver and `extractExcerpt`.
+* **Task:** Continue Phase 4 with **M4.3 — Embedded notes / transclusion**, reusing the shared `src/links/` resolver and `extractExcerpt`.
 * **Why this one:** Next roadmap milestone after backlinks + click-navigation + hover preview.
 * **Suggested prompt:** [.ai/PROMPTS/feature.md](../.ai/PROMPTS/feature.md).
 * **Starting files to read:**
@@ -134,3 +153,4 @@ None of these reverse the architecture; they are scoped placeholders with named 
 * **Should unresolved targets offer click-to-create** (with templates / location / front-matter), or stay a status-bar message?
 * **Should heading matching slugify** (shared with the outline) so `[[Note#Bold]]` finds `## **Bold**`?
 * **Should same-document `[[#heading]]` links scroll within the active note**, and if so via the editor (`revealLine`) or the preview?
+* **Should standard markdown links also support non-`.md` targets** (`./image.png`, `./script.js`) by opening them with `vscode.commands.executeCommand("vscode.open", uri)`, or stay strict-`.md`?
