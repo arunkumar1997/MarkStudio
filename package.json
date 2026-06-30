@@ -112,6 +112,15 @@
         "when": "activeCustomEditorId == 'markstudio.editor'"
       }
     ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "markstudio.graph.show",
+          "group": "navigation@99",
+          "when": "activeCustomEditorId == 'markstudio.editor'"
+        }
+      ]
+    },
     "configuration": {
       "title": "MarkStudio",
       "properties": {
